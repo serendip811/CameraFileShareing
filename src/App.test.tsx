@@ -4,6 +4,13 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App, { getCameraAccessErrorMessage } from './App';
 import { crc32Hex } from './protocol/checksum';
+import {
+  createChunkRequestPacket,
+  createOfferPacket,
+  decodeControlPacket,
+  encodeControlPacket,
+  type TransferOfferPacket,
+} from './protocol/controlPacket';
 import { decodePacket, encodePacket } from './protocol/packetCodec';
 import {
   DEFAULT_CHUNK_SIZE_BYTES,
@@ -85,12 +92,48 @@ function createDataPacket(chunkIndex: number, payload: Uint8Array, totalChunks =
 
 function getRenderedManifestPacket(): ManifestPacket {
   for (const [payload] of mocks.renderQrDataUrl.mock.calls) {
-    const packet = decodePacket(payload);
-    if (packet.type === 'manifest') {
-      return packet;
+    try {
+      const packet = decodePacket(payload);
+      if (packet.type === 'manifest') {
+        return packet;
+      }
+    } catch {
+      // Ignore non-transfer control packets.
     }
   }
   throw new Error('Expected rendered manifest packet');
+}
+
+function getRenderedOfferPacket(): TransferOfferPacket {
+  for (const [payload] of mocks.renderQrDataUrl.mock.calls) {
+    try {
+      const packet = decodeControlPacket(payload);
+      if (packet.type === 'offer') {
+        return packet;
+      }
+    } catch {
+      // Ignore transfer packets.
+    }
+  }
+  throw new Error('Expected rendered offer packet');
+}
+
+function getRenderedChunkRequest(): ReturnType<typeof createChunkRequestPacket> {
+  for (const [payload] of mocks.renderQrDataUrl.mock.calls) {
+    try {
+      const packet = decodeControlPacket(payload);
+      if (packet.type === 'request') {
+        return packet;
+      }
+    } catch {
+      // Ignore transfer packets.
+    }
+  }
+  throw new Error('Expected rendered chunk request packet');
+}
+
+function encodeChunkRequest(transferId: string, missingRanges: string): string {
+  return encodeControlPacket(createChunkRequestPacket(transferId, missingRanges));
 }
 
 async function goToSendMode() {
@@ -138,13 +181,26 @@ describe('App', () => {
     expect(screen.getByText('Choose a file up to 1MB.')).toBeInTheDocument();
   });
 
-  it('renders receiver camera controls from home', async () => {
+  it('starts receiver scanning without manual camera controls', async () => {
     render(<App />);
     await userEvent.click(screen.getByRole('button', { name: 'Receive' }));
-    expect(screen.getByRole('button', { name: 'Start camera' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Scan one frame' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Verify now' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Stop camera' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Scanning QR frames' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start camera' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Scan one frame' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Verify now' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Stop camera' })).not.toBeInTheDocument();
+  });
+
+  it('scans a sender offer and automatically shows an initial chunk request', async () => {
+    const offer = createOfferPacket(createManifestPacket({ totalChunks: 2, fileSize: DEFAULT_CHUNK_SIZE_BYTES + 1 }));
+    mocks.decodeQrFromImageData.mockReturnValueOnce(encodeControlPacket(offer)).mockReturnValue(null);
+
+    await goToReceiveMode();
+
+    expect(await screen.findByText(/Ready for hello\.txt/)).toBeInTheDocument();
+    expect(screen.getByText('Chunk request')).toBeInTheDocument();
+    const request = getRenderedChunkRequest();
+    expect(request).toMatchObject({ transferId: offer.transferId, missingRanges: '0-1' });
   });
 
   it('maps camera access errors to actionable messages', () => {
@@ -163,8 +219,7 @@ describe('App', () => {
     mocks.openCameraStream.mockReturnValue(pendingStream.promise);
 
     await goToReceiveMode();
-    await userEvent.click(screen.getByRole('button', { name: 'Start camera' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Stop camera' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Camera File Sharing' }));
 
     await act(async () => {
       pendingStream.resolve(stream);
@@ -172,10 +227,10 @@ describe('App', () => {
     });
 
     await waitFor(() => expect(mocks.stopCameraStream).toHaveBeenCalledWith(stream));
-    expect(screen.getByRole('heading', { name: 'Camera stopped' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Send' })).toBeInTheDocument();
   });
 
-  it('does not let a stale camera start stop a newer active stream', async () => {
+  it('does not let a stale receiver camera continuation stop a newer active stream', async () => {
     const firstPlay = createDeferred<void>();
     const firstStream = createMockStream();
     const secondStream = createMockStream();
@@ -185,8 +240,9 @@ describe('App', () => {
 
     await goToReceiveMode();
     await waitFor(() => expect(playMock).toHaveBeenCalledTimes(1));
+    await userEvent.click(screen.getByRole('button', { name: 'Camera File Sharing' }));
 
-    await userEvent.click(screen.getByRole('button', { name: 'Start camera' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Receive' }));
     await waitFor(() => expect(playMock).toHaveBeenCalledTimes(2));
     mocks.stopCameraStream.mockClear();
 
@@ -216,18 +272,16 @@ describe('App', () => {
         ),
       )
       .mockReturnValueOnce(encodePacket(dataPacket))
-      .mockReturnValueOnce(encodePacket(changedDataPacket));
+      .mockReturnValue(null);
 
     await goToReceiveMode();
-    await userEvent.click(screen.getByRole('button', { name: 'Scan one frame' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Scan one frame' }));
 
     expect(await screen.findByText('ACK payload')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Download verified file' })).toHaveAttribute('href', 'blob:verified');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Scan one frame' }));
+    mocks.decodeQrFromImageData.mockReturnValueOnce(encodePacket(changedDataPacket));
 
-    expect(screen.queryByText('ACK payload')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText('ACK payload')).not.toBeInTheDocument());
     expect(screen.queryByDisplayValue(/"type":"ack"/)).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Download verified file' })).not.toBeInTheDocument();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:verified');
@@ -251,14 +305,13 @@ describe('App', () => {
         ),
       )
       .mockReturnValueOnce(encodePacket(dataPacket))
-      .mockReturnValueOnce(encodePacket(changedDataPacket));
+      .mockReturnValue(null);
 
     await goToReceiveMode();
-    await userEvent.click(screen.getByRole('button', { name: 'Scan one frame' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Scan one frame' }));
     await waitFor(() => expect(mocks.renderQrDataUrl).toHaveBeenCalledTimes(1));
 
-    await userEvent.click(screen.getByRole('button', { name: 'Scan one frame' }));
+    mocks.decodeQrFromImageData.mockReturnValueOnce(encodePacket(changedDataPacket));
+    await waitFor(() => expect(mocks.decodeQrFromImageData.mock.calls.length).toBeGreaterThanOrEqual(3));
     await act(async () => {
       pendingQr.resolve('data:image/png;base64,stale');
       await pendingQr.promise;
@@ -286,62 +339,68 @@ describe('App', () => {
       secondRead.resolve(new Uint8Array([98]).buffer);
       await secondRead.promise;
     });
-    expect(await screen.findByText(/Sending second\.txt/)).toBeInTheDocument();
+    expect(await screen.findByText(/second\.txt is ready/)).toBeInTheDocument();
 
     await act(async () => {
       firstRead.resolve(new Uint8Array([97]).buffer);
       await firstRead.promise;
     });
 
-    expect(screen.getByText(/Sending second\.txt/)).toBeInTheDocument();
-    expect(screen.queryByText(/Sending first\.txt/)).not.toBeInTheDocument();
+    expect(screen.getByText(/second\.txt is ready/)).toBeInTheDocument();
+    expect(screen.queryByText(/first\.txt is ready/)).not.toBeInTheDocument();
   });
 
-  it('sends a selected file for one round and then waits for receiver QR', async () => {
+  it('offers a selected file and waits for receiver chunk request before sending data', async () => {
     await goToSendMode();
 
     await userEvent.upload(screen.getByLabelText('Choose file to send'), new File(['hi'], 'round.txt', { type: 'text/plain' }));
 
-    expect(await screen.findByText(/Sending round\.txt/)).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText(/Waiting for receiver QR/)).toBeInTheDocument());
-    expect(screen.queryByAltText('Current transfer QR frame')).not.toBeInTheDocument();
+    expect(await screen.findByText(/round\.txt is ready/)).toBeInTheDocument();
+    expect(screen.getByText('Phase: Offering file')).toBeInTheDocument();
+    const offer = getRenderedOfferPacket();
+    expect(offer.fileName).toBe('round.txt');
+    expect(() => getRenderedManifestPacket()).toThrow('Expected rendered manifest packet');
+
+    mocks.decodeQrFromImageData.mockReturnValueOnce(encodeChunkRequest(offer.transferId, '0')).mockReturnValue(null);
+
+    expect(await screen.findByText(/Sending 1 requested chunk/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Phase: Waiting for receiver request')).toBeInTheDocument());
+    expect(getRenderedManifestPacket().transferId).toBe(offer.transferId);
   });
 
-  it('scans a receiver NACK QR and sends only requested repair frames', async () => {
+  it('scans a receiver chunk request QR and sends only requested chunks', async () => {
     await goToSendMode();
     await userEvent.upload(
       screen.getByLabelText('Choose file to send'),
       new File(['repair me'], 'repair.txt', { type: 'text/plain' }),
     );
     await waitFor(() => expect(mocks.renderQrDataUrl).toHaveBeenCalled());
-    const manifest = getRenderedManifestPacket();
-    await waitFor(() => expect(screen.getByText(/Waiting for receiver QR/)).toBeInTheDocument());
+    const offer = getRenderedOfferPacket();
 
     mocks.decodeQrFromImageData.mockReturnValue(
-      encodePacket({
-        version: PROTOCOL_VERSION,
-        type: 'nack',
-        transferId: manifest.transferId,
-        missingRanges: '0',
-      }),
+      encodeChunkRequest(offer.transferId, '0'),
     );
 
-    expect(await screen.findByText(/Sending 1 requested repair frame/)).toBeInTheDocument();
-    expect(screen.getByText(/Receiver NACK scanned/)).toBeInTheDocument();
+    expect(await screen.findByText(/Sending 1 requested chunk/)).toBeInTheDocument();
+    expect(screen.getByText(/Receiver request scanned/)).toBeInTheDocument();
   });
 
   it('scans a receiver ACK QR and completes the sender transfer', async () => {
     await goToSendMode();
     await userEvent.upload(screen.getByLabelText('Choose file to send'), new File(['done'], 'done.txt', { type: 'text/plain' }));
     await waitFor(() => expect(mocks.renderQrDataUrl).toHaveBeenCalled());
-    const manifest = getRenderedManifestPacket();
+    const offer = getRenderedOfferPacket();
+
+    mocks.decodeQrFromImageData.mockReturnValueOnce(encodeChunkRequest(offer.transferId, '0')).mockReturnValue(null);
+    expect(await screen.findByText(/Sending 1 requested chunk/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Phase: Waiting for receiver request')).toBeInTheDocument());
 
     mocks.decodeQrFromImageData.mockReturnValue(
       encodePacket({
         version: PROTOCOL_VERSION,
         type: 'ack',
-        transferId: manifest.transferId,
-        sha256: manifest.sha256,
+        transferId: offer.transferId,
+        sha256: offer.sha256,
       }),
     );
 

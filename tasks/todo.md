@@ -245,3 +245,19 @@ Design note: the existing packet protocol stays unchanged. The UI should behave 
 Result: targeted verification under Node 20.20.2 passed. `npm test -- src/App.test.tsx` exited 0 with 1 file and 13 tests passing. Full verification under Node 20.20.2 also passed: `npm test` exited 0 with 12 files and 89 tests passing; `npm run build` exited 0; `GITHUB_ACTIONS=true GITHUB_REPOSITORY=serendip811/CameraFileShareing npm run build` exited 0.
 
 Browser result: in-app browser verification passed for desktop and 390px mobile. Sender shows file input, receiver-result camera preview, and manual ACK/NACK fallback; receiver shows camera controls and auto-verification copy; 390px mobile entered `Scanning QR frames`; browser console error logs were empty. Actual physical two-device transfer remains the remaining manual hardware check.
+
+## HTTP-like Automatic QR Request/Response UX
+
+- [x] Add control QR packets for sender `offer` and receiver chunk `request`
+- [x] Change sender file selection to show only `offer` until a matching receiver request is scanned
+- [x] Change receiver offer handling to display a chunk request QR automatically
+- [x] Remove manual camera, scan-frame, verify, and payload-fallback controls from the main UI
+- [x] Keep sender data rounds finite and only in response to matching receiver requests
+- [x] Keep receiver repair requests authoritative: request all chunks initially, then only missing chunks after verification
+- [x] Update App/protocol tests for automatic request-response flow
+- [x] Update README to describe HTTP-like QR flow
+- [x] Verify `npm test`, `npm run build`, GitHub Actions-style build, and browser desktop/mobile UI
+
+Design note: sender behaves like a file server and receiver behaves like an HTTP client. Sender advertises metadata with an `offer` QR. Receiver scans the offer and displays a `request` QR for chunk ranges. Sender only emits manifest/data frames after scanning a matching request, then waits for the next request or final ACK. No user-facing Start camera, Scan frame, Verify, or manual payload controls should remain.
+
+Result: HTTP-like QR request/response UX implemented. Verification under Node 20.20.2 passed: `npm test -- src/protocol/controlPacket.test.ts src/App.test.tsx` exited 0 with 2 files and 19 tests passing; full `npm test` exited 0 with 13 files and 95 tests passing; `npm run build` exited 0; `GITHUB_ACTIONS=true GITHUB_REPOSITORY=serendip811/CameraFileShareing npm run build` exited 0. Browser verification passed on desktop and 390px mobile with no horizontal overflow and no console errors; Send/Receive screens no longer expose Start camera, Scan one frame, Verify, Stop camera, manual payload controls, or textareas.
