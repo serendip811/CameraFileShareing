@@ -1,5 +1,12 @@
 import { sha256Hex } from './checksum';
 import { MAX_FILE_SIZE_BYTES, type FileManifest } from './types';
+import {
+  calculateTotalChunks,
+  validateFileName,
+  validateMimeType,
+  validateNonEmptyFileSize,
+  validateTransferId,
+} from './validation';
 
 interface CreateManifestInput {
   bytes: Uint8Array;
@@ -27,20 +34,26 @@ export function createTransferId(): string {
 export async function createManifestFromBytes(input: CreateManifestInput): Promise<FileManifest> {
   validateChunkSize(input.chunkSize);
   enforceMvpFileLimit(input.bytes.byteLength);
+  validateNonEmptyFileSize(input.bytes.byteLength);
+
+  const transferId = input.transferId === undefined ? createTransferId() : validateTransferId(input.transferId);
+  const fileName = validateFileName(input.fileName);
+  const mimeType = validateMimeType(input.mimeType);
 
   return {
-    transferId: input.transferId ?? createTransferId(),
-    fileName: input.fileName,
-    mimeType: input.mimeType || 'application/octet-stream',
+    transferId,
+    fileName,
+    mimeType,
     fileSize: input.bytes.byteLength,
     chunkSize: input.chunkSize,
-    totalChunks: Math.ceil(input.bytes.byteLength / input.chunkSize),
+    totalChunks: calculateTotalChunks(input.bytes.byteLength, input.chunkSize),
     sha256: await sha256Hex(input.bytes),
   };
 }
 
 export async function readFileBytes(file: File): Promise<Uint8Array> {
   enforceMvpFileLimit(file.size);
+  validateNonEmptyFileSize(file.size);
   return new Uint8Array(await file.arrayBuffer());
 }
 

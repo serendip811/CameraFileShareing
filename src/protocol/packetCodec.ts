@@ -1,7 +1,14 @@
 import { base64UrlDecode, base64UrlEncode } from './binary';
 import { crc32Hex } from './checksum';
-import { expandMissingRanges } from './missingRanges';
 import { MAX_FILE_SIZE_BYTES, PROTOCOL_VERSION, type TransferPacket } from './types';
+import {
+  validateFileName,
+  validateManifestChunkCount,
+  validateMimeType,
+  validateMissingRangeSyntax,
+  validateNonEmptyFileSize,
+  validateTransferId,
+} from './validation';
 
 type WirePacket =
   | {
@@ -24,7 +31,6 @@ type JsonRecord = Record<string, unknown>;
 const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/;
 const CRC32_HEX_PATTERN = /^[0-9a-f]{8}$/;
 const BASE64_URL_PATTERN = /^[A-Za-z0-9_-]*$/;
-const MAX_NACK_CHUNKS = MAX_FILE_SIZE_BYTES;
 
 export function encodePacket(packet: TransferPacket): string {
   return JSON.stringify(toWire(packet));
@@ -47,6 +53,9 @@ export function decodePacket(value: string): TransferPacket {
   }
   if (wire.t === 'data') {
     const payload = base64UrlDecode(wire.p);
+    if (base64UrlEncode(payload) !== wire.p) {
+      throw new Error('Payload must be canonical Base64URL encoded');
+    }
     const actualCrc = crc32Hex(payload);
     if (actualCrc !== wire.crc) {
       throw new Error('CRC mismatch');
@@ -93,15 +102,21 @@ function parseWirePacket(value: string): WirePacket {
   const transferId = validateTransferId(parsed.id);
 
   if (parsed.t === 'manifest') {
+    const fileSize = validateFileSize(parsed.size);
+    validateNonEmptyFileSize(fileSize);
+    const chunkSize = validatePositiveInteger(parsed.chunkSize, 'Chunk size must be a positive integer');
+    const totalChunks = validatePositiveInteger(parsed.chunks, 'Total chunks must be a positive integer');
+    validateManifestChunkCount(fileSize, chunkSize, totalChunks);
+
     return {
       v: PROTOCOL_VERSION,
       id: transferId,
       t: 'manifest',
-      name: validateString(parsed.name, 'File name must be a string'),
-      mime: validateString(parsed.mime, 'MIME type must be a string'),
-      size: validateFileSize(parsed.size),
-      chunkSize: validatePositiveInteger(parsed.chunkSize, 'Chunk size must be a positive integer'),
-      chunks: validatePositiveInteger(parsed.chunks, 'Total chunks must be a positive integer'),
+      name: validateFileName(parsed.name),
+      mime: validateMimeType(parsed.mime),
+      size: fileSize,
+      chunkSize,
+      chunks: totalChunks,
       sha256: validateSha256(parsed.sha256),
     };
   }
@@ -129,7 +144,7 @@ function parseWirePacket(value: string): WirePacket {
 
   if (parsed.t === 'nack') {
     const missing = validateString(parsed.missing, 'Missing ranges must be a string');
-    expandMissingRanges(missing, MAX_NACK_CHUNKS);
+    validateMissingRangeSyntax(missing);
     return { v: PROTOCOL_VERSION, id: transferId, t: 'nack', missing };
   }
 
@@ -175,13 +190,6 @@ function validateVersion(value: unknown): void {
   if (value !== PROTOCOL_VERSION) {
     throw new Error(`Unsupported protocol version: ${String(value)}`);
   }
-}
-
-function validateTransferId(value: unknown): string {
-  if (typeof value !== 'string' || value.length === 0) {
-    throw new Error('Transfer ID must be a non-empty string');
-  }
-  return value;
 }
 
 function validateString(value: unknown, message: string): string {
