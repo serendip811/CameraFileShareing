@@ -84,7 +84,7 @@
   - [x] Verify `npm test -- src/App.test.tsx`, `npm test`, and `npm run build` under Node 20.20.2
   - [x] Commit Task 6 UI changes
 - [ ] Build the approved MVP
-- [ ] Verify transfer behavior with repeatable tests
+- [x] Verify transfer behavior with repeatable tests
 - [ ] Document results and remaining risks
 
 ## Review
@@ -194,3 +194,13 @@ Result: Task 6 review fixes verified under Node 20.20.2. RED check showed 4 inte
 - [x] Verify `npm test -- src/App.test.tsx`, `npm test`, and `npm run build` under Node 20.20.2
 
 Result: Task 6 re-review found a remaining Critical race where an old `startCamera()` continuation could stop a newer stream, plus an Important stale async verification result risk. RED check showed 2 intended App test failures before implementation. Final verification: `npm test -- src/App.test.tsx` exited 0 with 1 file and 10 tests passing; `npm test` exited 0 with 11 files and 84 tests passing; `npm run build` exited 0.
+
+## Task 7 End-to-End Simulation and Documentation
+
+- [x] Add simulated transfer test for intentionally dropped chunks and NACK repair
+- [x] Verify repaired transfer reaches ACK and rebuilds the original file bytes
+- [x] Add README with run commands, MVP limits, HTTPS camera note, and manual verification checklist
+- [x] Verify `npm test` and `npm run build` under Node 20.20.2
+- [ ] Commit Task 7 simulation and docs
+
+Result so far: targeted verification under Node 20.20.2 passed. `npm test -- src/transfer/simulation.test.ts` exited 0 with 1 file and 1 test passing. Full verification under Node 20.20.2 also passed: `npm test` exited 0 with 12 files and 85 tests passing; `npm run build` exited 0.
