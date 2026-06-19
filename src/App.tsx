@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { decodePacket, encodePacket } from './protocol/packetCodec';
-import { DEFAULT_CHUNK_SIZE_BYTES, DEFAULT_FRAME_INTERVAL_MS, type TransferPacket } from './protocol/types';
+import {
+  DEFAULT_CHUNK_SIZE_BYTES,
+  DEFAULT_FRAME_INTERVAL_MS,
+  MAX_FILE_SIZE_BYTES,
+  type TransferPacket,
+} from './protocol/types';
 import { renderQrDataUrl } from './qr/qrDisplay';
 import {
   CameraAccessError,
@@ -89,6 +94,7 @@ function SendPanel() {
   const [receiverPayload, setReceiverPayload] = useState('');
   const timerRef = useRef<number | null>(null);
   const streamRunRef = useRef(0);
+  const prepareRunRef = useRef(0);
 
   const stopStream = useCallback(() => {
     if (timerRef.current !== null) {
@@ -141,9 +147,17 @@ function SendPanel() {
     [renderPacket, stopStream],
   );
 
-  useEffect(() => stopStream, [stopStream]);
+  useEffect(
+    () => () => {
+      prepareRunRef.current += 1;
+      stopStream();
+    },
+    [stopStream],
+  );
 
   async function handleFile(file: File): Promise<void> {
+    const runId = prepareRunRef.current + 1;
+    prepareRunRef.current = runId;
     setError('');
     stopStream();
     setQrUrl('');
@@ -153,13 +167,22 @@ function SendPanel() {
     setStatus('Preparing sender transfer...');
 
     try {
+      if (file.size > MAX_FILE_SIZE_BYTES) {
+        throw new Error('File is larger than the 1MB MVP limit.');
+      }
       const bytes = new Uint8Array(await file.arrayBuffer());
+      if (prepareRunRef.current !== runId) {
+        return;
+      }
       const nextTransfer = await prepareSenderTransfer({
         bytes,
         fileName: file.name,
         mimeType: file.type || 'application/octet-stream',
         chunkSize: DEFAULT_CHUNK_SIZE_BYTES,
       });
+      if (prepareRunRef.current !== runId) {
+        return;
+      }
       setTransfer(nextTransfer);
       startStream(
         nextTransfer.packets,
@@ -167,9 +190,13 @@ function SendPanel() {
         `${nextTransfer.manifest.fileName} is streaming as ${nextTransfer.manifest.totalChunks} data chunks.`,
       );
     } catch (prepareError) {
+      if (prepareRunRef.current !== runId) {
+        return;
+      }
       setTransfer(null);
       setStatus('Choose a file up to 1MB.');
-      setError(`Could not prepare file: ${getErrorText(prepareError)}`);
+      const text = getErrorText(prepareError);
+      setError(text === 'File is larger than the 1MB MVP limit.' ? text : `Could not prepare file: ${text}`);
     }
   }
 
@@ -304,10 +331,13 @@ function ReceivePanel() {
   const streamRef = useRef<MediaStream | null>(null);
   const scanTimerRef = useRef<number | null>(null);
   const downloadUrlRef = useRef<string | null>(null);
+  const cameraRunRef = useRef(0);
+  const receiverStateRef = useRef(receiverState);
 
   const progress = useMemo(() => getReceiverProgress(receiverState), [receiverState]);
 
   const stopCameraTracks = useCallback(() => {
+    cameraRunRef.current += 1;
     if (scanTimerRef.current !== null) {
       window.clearInterval(scanTimerRef.current);
       scanTimerRef.current = null;
@@ -328,6 +358,18 @@ function ReceivePanel() {
     }
     setDownload(null);
   }, []);
+
+  const clearVerificationResult = useCallback(() => {
+    setResultPayload('');
+    setResultQrUrl('');
+    setResultType(null);
+    clearDownload();
+  }, [clearDownload]);
+
+  function setNextReceiverState(nextState: ReceiverState): void {
+    receiverStateRef.current = nextState;
+    setReceiverState(nextState);
+  }
 
   useEffect(
     () => () => {
@@ -359,7 +401,11 @@ function ReceivePanel() {
       }
 
       const packet = decodePacket(payload);
-      setReceiverState((current) => ingestPacket(current, packet));
+      const nextState = ingestPacket(receiverStateRef.current, packet);
+      if (nextState !== receiverStateRef.current) {
+        setNextReceiverState(nextState);
+        clearVerificationResult();
+      }
       setMessage(`Read ${packet.type} packet.`);
       setError('');
       return true;
@@ -376,19 +422,34 @@ function ReceivePanel() {
   async function startCamera(): Promise<void> {
     setError('');
     stopCameraTracks();
+    const runId = cameraRunRef.current + 1;
+    cameraRunRef.current = runId;
 
     try {
       const stream = await openCameraStream();
+      if (cameraRunRef.current !== runId) {
+        stopCameraStream(stream);
+        return;
+      }
       streamRef.current = stream;
       if (videoRef.current !== null) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
+      if (cameraRunRef.current !== runId) {
+        stopCameraTracks();
+        return;
+      }
       setMessage('Scanning QR frames');
       scanTimerRef.current = window.setInterval(() => {
-        scanFrame({ quiet: true });
+        if (cameraRunRef.current === runId) {
+          scanFrame({ quiet: true });
+        }
       }, SCAN_INTERVAL_MS);
     } catch (cameraError) {
+      if (cameraRunRef.current !== runId) {
+        return;
+      }
       stopCameraTracks();
       setMessage('Camera receiver');
       setError(getCameraAccessErrorMessage(cameraError));
@@ -399,7 +460,8 @@ function ReceivePanel() {
     setError('');
 
     try {
-      const result = await verifyReceiverState(receiverState);
+      const currentState = receiverStateRef.current;
+      const result = await verifyReceiverState(currentState);
       const payload = encodePacket(result);
       const nextQrUrl = await renderQrDataUrl(payload);
       setResultPayload(payload);
@@ -407,7 +469,7 @@ function ReceivePanel() {
       setResultType(result.type);
 
       if (result.type === 'ack') {
-        const file = await buildVerifiedFile(receiverState);
+        const file = await buildVerifiedFile(currentState);
         if (file !== null) {
           clearDownload();
           const url = URL.createObjectURL(new Blob([toArrayBuffer(file.bytes)], { type: file.mimeType }));

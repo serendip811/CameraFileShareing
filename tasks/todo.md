@@ -163,3 +163,24 @@ Result: Task 4 fix re-review passed with no Critical or Important findings. Rema
 Result: Task 4 review fixes verified under Node 20.20.2. RED checks showed 8 intended transfer test failures before implementation. Final verification: `npm test -- src/transfer` exited 0 with 2 files and 15 tests passing; `npm test -- src/protocol src/transfer` exited 0 with 8 files and 59 tests passing; `npm run build` exited 0.
 
 Task 4 review gate passed after `2fe963d`; no Critical or Important findings remain. Carry-forward for Task 6: use `selectRepairPacketsForNack` for receiver NACK handling.
+
+## Task 6 Code Quality Review
+
+- [x] Inspect `eb24119..a30c741` diff and changed UI files
+- [x] Check sender QR streaming, ACK/NACK repair flow, cleanup, and URL lifecycle
+- [x] Check receiver camera scan loop, verification state, download URL lifecycle, and stale closure risks
+- [x] Review UI tests and CSS responsiveness for Task 7/8 readiness
+- [x] Run targeted verification and record readiness assessment
+
+Result: Task 6 code quality review found one Critical camera lifecycle race, plus Important follow-ups for stale receiver verification output, async sender file-selection races, missing pre-read file-size enforcement, and shallow App behavior tests. Verification still passed under Node 20.20.2: `npm test -- src/App.test.tsx`, `npm test`, `npm run build`, and `git diff --check eb24119..a30c741` exited 0. Readiness: not ready for Task 7 until the Critical camera lifecycle issue and behavior-test gaps are addressed.
+
+## Task 6 Review Fixes
+
+- [x] Add RED App tests for camera start cancellation, receiver stale result clearing, sender preparation race, and pre-read size guard
+- [x] Fix receiver async camera lifecycle with a run token and stale stream cleanup
+- [x] Clear receiver verification QR/payload/download artifacts when scan ingest changes transfer state
+- [x] Fix sender async file preparation race and reject oversized files before reading bytes
+- [x] Verify `npm test -- src/App.test.tsx`, `npm test`, and `npm run build` under Node 20.20.2
+- [x] Commit Task 6 review fixes
+
+Result: Task 6 review fixes verified under Node 20.20.2. RED check showed 4 intended App test failures before implementation: late camera stream cleanup, stale receiver ACK/download clearing, out-of-order sender file preparation, and oversized file pre-read rejection. Final verification: `npm test -- src/App.test.tsx` exited 0 with 1 file and 8 tests passing; `npm test` exited 0 with 11 files and 82 tests passing; `npm run build` exited 0.
