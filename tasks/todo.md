@@ -74,6 +74,15 @@
   - [x] Implement typed camera error model and `getUserMedia` failure mapping
   - [x] Verify QR, protocol, transfer tests, and production build under Node 20.20.2
   - [x] Commit camera error classification fix
+- [x] Implement Task 6 React sender and receiver UI
+  - [x] Add App UI tests and confirm RED
+  - [x] Replace app shell with home, sender, and receiver modes
+  - [x] Wire sender file preparation, QR streaming, ACK completion, and NACK repair selection with `selectRepairPacketsForNack`
+  - [x] Wire receiver camera start/stop, scan loop, verification QR, and verified download URL
+  - [x] Map `CameraAccessError.code` values to actionable UI messages
+  - [x] Expand responsive UI styles
+  - [x] Verify `npm test -- src/App.test.tsx`, `npm test`, and `npm run build` under Node 20.20.2
+  - [x] Commit Task 6 UI changes
 - [ ] Build the approved MVP
 - [ ] Verify transfer behavior with repeatable tests
 - [ ] Document results and remaining risks
@@ -95,6 +104,8 @@
 - Task 5 QR display and scanner adapters committed as `37ba393` (`feat: add QR display and scanner adapters`). RED checks observed missing `qrDisplay` and `qrScanner` modules before implementation. Final verification under Node 20.20.2: `npm test -- src/qr` exited 0 with 2 files and 5 tests passing; `npm test -- src/protocol src/transfer src/qr` exited 0 with 10 files and 64 tests passing; `npm run build` exited 0; extra full `npm test` exited 0 with 10 files and 64 tests passing.
 - Task 5 self-review: QR display uses the requested low error-correction, margin, and scale settings; scanner decode returns payload data or `null`; camera stream lifecycle stays in `src/qr`; stop logic stops every track; capture rejects zero-size frames and reads from a 2D canvas.
 - Task 5 camera access review fix: RED check showed 4 expected QR scanner failures before implementation. Final verification under Node 20.20.2: `npm test -- src/qr` exited 0 with 2 files and 15 tests passing; `npm test -- src/protocol src/transfer src/qr` exited 0 with 10 files and 74 tests passing; `npm run build` exited 0.
+- Task 6 React UI committed as `604a701` (`feat: add QR transfer UI`). RED check under Node 20.20.2 showed 4 expected App test failures before implementation: missing `Send`/`Receive` buttons, missing sender/receiver controls, and missing camera error helper. Final verification under Node 20.20.2: `npm test -- src/App.test.tsx` exited 0 with 1 file and 4 tests passing; `npm test` exited 0 with 11 files and 78 tests passing; `npm run build` exited 0.
+- Task 6 self-review: sender validates ACK transfer ID and SHA-256, uses `selectRepairPacketsForNack` for NACK repair frames, and stops streaming on completion; receiver maps `CameraAccessError.code` to actionable messages, stops camera tracks and scan timers on cleanup, revokes verified-file object URLs, and only creates the download link after ACK verification.
 
 ## Task 2 Missing Range Re-review
 
