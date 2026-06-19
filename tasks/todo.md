@@ -60,6 +60,8 @@
   - [x] Verify `npm test -- src/protocol src/transfer` under Node 20.20.2
   - [x] Verify `npm run build` under Node 20.20.2
   - [x] Commit Task 4 transfer files
+  - [x] Spec compliance review passed
+  - [x] Code quality re-review passed after repeated manifest fix
 - [ ] Build the approved MVP
 - [ ] Verify transfer behavior with repeatable tests
 - [ ] Document results and remaining risks
@@ -112,6 +114,15 @@ Task 2 review gate passed with no Critical or Important issues after `efedd49` (
 
 Result: Task 4 code quality review found one Critical issue and multiple Important follow-ups. Verification still passed under Node 20.20.2: `npm test -- src/transfer` exited 0 with 2 files and 8 tests passing; `npm test -- src/protocol src/transfer` exited 0 with 8 files and 52 tests passing; `npm run build` exited 0. Readiness: not ready for Task 5 until repeated manifest handling is fixed.
 
+## Task 4 Fix Re-review
+
+- [x] Inspect `2fe963d` fix diff and current transfer files
+- [x] Verify repeated manifest, conflicting manifest, hash mismatch, NACK transfer ID, looped stream, and repair regression coverage
+- [x] Run protocol/transfer tests and production build under Node 20.20.2
+- [x] Record re-review findings and Task 5 readiness
+
+Result: Task 4 fix re-review passed with no Critical or Important findings. Remaining note: Task 6 should use `selectRepairPacketsForNack` rather than the string-only helper. Verification under Node 20.20.2: `npm test -- src/protocol src/transfer && npm run build` exited 0 with 8 test files and 59 tests passing, followed by a successful production build. Readiness: ready for Task 5.
+
 ## Task 4 Code Quality Review Fixes
 
 - [x] Add RED tests for repeated manifests, conflicting manifests, actionable verification-failure NACKs, NACK transfer ID validation, and repair loops
@@ -124,3 +135,5 @@ Result: Task 4 code quality review found one Critical issue and multiple Importa
 - [x] Verify `npm run build` under Node 20.20.2
 
 Result: Task 4 review fixes verified under Node 20.20.2. RED checks showed 8 intended transfer test failures before implementation. Final verification: `npm test -- src/transfer` exited 0 with 2 files and 15 tests passing; `npm test -- src/protocol src/transfer` exited 0 with 8 files and 59 tests passing; `npm run build` exited 0.
+
+Task 4 review gate passed after `2fe963d`; no Critical or Important findings remain. Carry-forward for Task 6: use `selectRepairPacketsForNack` for receiver NACK handling.
