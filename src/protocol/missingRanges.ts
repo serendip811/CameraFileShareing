@@ -34,10 +34,14 @@ export function expandMissingRanges(value: string): number[] {
     return [];
   }
   return value.split(',').flatMap((part) => {
-    const [startText, endText] = part.split('-');
+    const match = /^(\d+)(?:-(\d+))?$/.exec(part);
+    if (match === null) {
+      throw new Error(`Invalid missing range: ${part}`);
+    }
+    const [, startText, endText] = match;
     const start = Number(startText);
     const end = endText === undefined ? start : Number(endText);
-    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start) {
+    if (end < start) {
       throw new Error(`Invalid missing range: ${part}`);
     }
     return Array.from({ length: end - start + 1 }, (_, offset) => start + offset);
