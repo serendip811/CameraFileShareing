@@ -23,6 +23,10 @@
   - [x] Make build type checks non-emitting
   - [x] Move Vite packages to development dependencies and refresh lockfile
   - [x] Verify install, build, and clean generated-artifact status
+- [x] Complete Task 1 scaffold review gate
+  - [x] Spec compliance review passed
+  - [x] Code quality re-review passed with no Critical or Important issues
+- [ ] Implement Task 2 protocol primitives
 - [ ] Build the approved MVP
 - [ ] Verify transfer behavior with repeatable tests
 - [ ] Document results and remaining risks
