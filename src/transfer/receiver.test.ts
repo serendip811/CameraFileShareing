@@ -62,6 +62,23 @@ describe('receiver transfer', () => {
     await expect(verifyReceiverState(state)).resolves.toMatchObject({ type: 'ack', transferId: TRANSFER_ID });
   });
 
+  it('ignores identical duplicate data packets without changing state', async () => {
+    const sender = await prepareSenderTransfer({
+      bytes: new Uint8Array([1, 2, 3]),
+      fileName: 'a.bin',
+      mimeType: 'application/octet-stream',
+      chunkSize: 2,
+      transferId: TRANSFER_ID,
+    });
+    let state = createReceiverState();
+    state = ingestPacket(state, sender.packets[0]);
+    const afterFirstData = ingestPacket(state, sender.dataPackets[0]);
+    const afterDuplicateData = ingestPacket(afterFirstData, sender.dataPackets[0]);
+
+    expect(afterDuplicateData).toBe(afterFirstData);
+    expect(getReceiverProgress(afterDuplicateData)).toMatchObject({ receivedChunks: 1, totalChunks: 2, missingChunks: 1 });
+  });
+
   it('rejects conflicting manifests without switching transfers or dropping chunks', async () => {
     const sender = await prepareSenderTransfer({
       bytes: new Uint8Array([1, 2, 3]),

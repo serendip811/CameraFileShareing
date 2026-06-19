@@ -148,7 +148,8 @@ h2 {
 }
 
 .fileDrop,
-.payloadPanel {
+.payloadPanel,
+.cameraPanel {
   display: grid;
   gap: 10px;
   border: 1px solid #d7dde0;
@@ -178,6 +179,10 @@ input[type="file"] {
   gap: 10px;
 }
 
+.controls.twoUp {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .qrStage {
   display: grid;
   justify-items: start;
@@ -202,6 +207,10 @@ input[type="file"] {
   border-radius: 8px;
   background: #101510;
   object-fit: cover;
+}
+
+.compactPreview {
+  max-height: 260px;
 }
 
 .statusLine {

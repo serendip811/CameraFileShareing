@@ -64,6 +64,11 @@ export function ingestPacket(state: ReceiverState, packet: TransferPacket): Rece
     return { ...state, rejectedFrames: state.rejectedFrames + 1 };
   }
 
+  const existing = state.chunks.get(packet.chunkIndex);
+  if (existing !== undefined && bytesEqual(existing, packet.payload)) {
+    return state;
+  }
+
   const chunks = new Map(state.chunks);
   chunks.set(packet.chunkIndex, packet.payload);
   return { ...state, chunks };
@@ -184,6 +189,18 @@ function isSameManifest(current: FileManifest, incoming: FileManifest): boolean 
     incoming.totalChunks === current.totalChunks &&
     incoming.sha256 === current.sha256
   );
+}
+
+function bytesEqual(left: Uint8Array, right: Uint8Array): boolean {
+  if (left.byteLength !== right.byteLength) {
+    return false;
+  }
+  for (let index = 0; index < left.byteLength; index += 1) {
+    if (left[index] !== right[index]) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function getAllChunkIndexes(totalChunks: number): number[] {

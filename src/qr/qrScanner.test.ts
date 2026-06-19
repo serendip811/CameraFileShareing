@@ -97,7 +97,7 @@ describe('qrScanner', () => {
     expect(secondTrack.stop).toHaveBeenCalledTimes(1);
   });
 
-  it('requests the environment camera without audio', async () => {
+  it('requests the user-facing camera without audio', async () => {
     const stream = { getTracks: () => [] } as unknown as MediaStream;
     const getUserMedia = vi.fn<(constraints?: MediaStreamConstraints) => Promise<MediaStream>>().mockResolvedValue(stream);
     setSecureContext(true);
@@ -108,7 +108,7 @@ describe('qrScanner', () => {
     expect(getUserMedia).toHaveBeenCalledWith({
       audio: false,
       video: {
-        facingMode: 'environment',
+        facingMode: 'user',
       },
     });
   });

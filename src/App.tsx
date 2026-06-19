@@ -25,9 +25,10 @@ import {
 import { prepareSenderTransfer, selectRepairPacketsForNack, type SenderTransfer } from './transfer/sender';
 
 type Mode = 'home' | 'send' | 'receive';
-type SenderPhase = 'idle' | 'streaming' | 'repairing' | 'complete';
+type SenderPhase = 'idle' | 'sending' | 'waiting' | 'repairing' | 'complete';
 
 const SCAN_INTERVAL_MS = 120;
+const RECEIVER_SETTLE_MS = 900;
 
 export function getCameraAccessErrorMessage(error: unknown): string {
   if (!(error instanceof CameraAccessError)) {
@@ -91,12 +92,20 @@ function SendPanel() {
   const [frameCount, setFrameCount] = useState(0);
   const [status, setStatus] = useState('Choose a file up to 1MB.');
   const [error, setError] = useState('');
+  const [cameraMessage, setCameraMessage] = useState('Sender camera scans the receiver result QR automatically.');
   const [receiverPayload, setReceiverPayload] = useState('');
+  const responseVideoRef = useRef<HTMLVideoElement | null>(null);
+  const responseCanvasRef = useRef<HTMLCanvasElement | null>(null);
+  const responseStreamRef = useRef<MediaStream | null>(null);
+  const responseScanTimerRef = useRef<number | null>(null);
+  const responseCameraRunRef = useRef(0);
+  const transferRef = useRef<SenderTransfer | null>(null);
+  const lastReceiverPayloadRef = useRef('');
   const timerRef = useRef<number | null>(null);
   const streamRunRef = useRef(0);
   const prepareRunRef = useRef(0);
 
-  const stopStream = useCallback(() => {
+  const stopRound = useCallback(() => {
     if (timerRef.current !== null) {
       window.clearInterval(timerRef.current);
       timerRef.current = null;
@@ -113,17 +122,17 @@ function SendPanel() {
         }
       } catch (renderError) {
         if (streamRunRef.current === runId) {
-          stopStream();
+          stopRound();
           setError(`Could not render QR frame: ${getErrorText(renderError)}`);
         }
       }
     },
-    [stopStream],
+    [stopRound],
   );
 
-  const startStream = useCallback(
-    (packets: TransferPacket[], nextPhase: SenderPhase, nextStatus: string) => {
-      stopStream();
+  const startPacketRound = useCallback(
+    (packets: TransferPacket[], nextPhase: Extract<SenderPhase, 'sending' | 'repairing'>, nextStatus: string) => {
+      stopRound();
       if (packets.length === 0) {
         setError('No QR frames are available to stream.');
         return;
@@ -139,32 +148,142 @@ function SendPanel() {
       void renderPacket(packets[0], runId);
 
       timerRef.current = window.setInterval(() => {
-        nextIndex = (nextIndex + 1) % packets.length;
+        nextIndex += 1;
+        if (nextIndex >= packets.length) {
+          window.clearInterval(timerRef.current ?? undefined);
+          timerRef.current = null;
+          if (streamRunRef.current === runId) {
+            setQrUrl('');
+            setPhase('waiting');
+            setStatus('Round sent. Keep both devices facing each other while waiting for receiver ACK/NACK QR.');
+          }
+          return;
+        }
         setFrameIndex(nextIndex);
         void renderPacket(packets[nextIndex], runId);
       }, DEFAULT_FRAME_INTERVAL_MS);
     },
-    [renderPacket, stopStream],
+    [renderPacket, stopRound],
   );
+
+  const releaseResponseStream = useCallback((stream: MediaStream) => {
+    stopCameraStream(stream);
+    if (responseStreamRef.current === stream) {
+      responseStreamRef.current = null;
+    }
+    const video = responseVideoRef.current;
+    if (video?.srcObject === stream) {
+      video.srcObject = null;
+    }
+  }, []);
+
+  const stopResponseCamera = useCallback(() => {
+    responseCameraRunRef.current += 1;
+    if (responseScanTimerRef.current !== null) {
+      window.clearInterval(responseScanTimerRef.current);
+      responseScanTimerRef.current = null;
+    }
+    if (responseStreamRef.current !== null) {
+      releaseResponseStream(responseStreamRef.current);
+    }
+    if (responseVideoRef.current !== null) {
+      responseVideoRef.current.srcObject = null;
+    }
+  }, [releaseResponseStream]);
 
   useEffect(
     () => () => {
       prepareRunRef.current += 1;
-      stopStream();
+      stopRound();
+      stopResponseCamera();
     },
-    [stopStream],
+    [stopResponseCamera, stopRound],
   );
+
+  function setCurrentTransfer(nextTransfer: SenderTransfer | null): void {
+    transferRef.current = nextTransfer;
+    setTransfer(nextTransfer);
+  }
+
+  function scanReceiverFrame(options: { quiet: boolean }): boolean {
+    if (responseVideoRef.current === null || responseCanvasRef.current === null) {
+      if (!options.quiet) {
+        setCameraMessage('Start the sender camera before scanning receiver result QR.');
+      }
+      return false;
+    }
+
+    try {
+      const imageData = captureVideoFrame(responseVideoRef.current, responseCanvasRef.current);
+      const payload = decodeQrFromImageData(imageData);
+      if (payload === null) {
+        if (!options.quiet) {
+          setCameraMessage('No receiver result QR found in this frame.');
+        }
+        return false;
+      }
+      return applyReceiverPayload(payload, 'scan');
+    } catch (scanError) {
+      const text = getErrorText(scanError);
+      if (!options.quiet || text !== 'Video frame is not ready') {
+        setCameraMessage(text === 'Video frame is not ready' ? 'Sender camera is warming up.' : `Could not scan: ${text}`);
+      }
+      return false;
+    }
+  }
+
+  async function startResponseCamera(): Promise<void> {
+    setError('');
+    stopResponseCamera();
+    const runId = responseCameraRunRef.current + 1;
+    responseCameraRunRef.current = runId;
+    let stream: MediaStream | null = null;
+
+    try {
+      stream = await openCameraStream();
+      if (responseCameraRunRef.current !== runId) {
+        releaseResponseStream(stream);
+        return;
+      }
+      responseStreamRef.current = stream;
+      if (responseVideoRef.current !== null) {
+        responseVideoRef.current.srcObject = stream;
+        await responseVideoRef.current.play();
+      }
+      if (responseCameraRunRef.current !== runId) {
+        releaseResponseStream(stream);
+        return;
+      }
+      setCameraMessage('Scanning receiver ACK/NACK QR.');
+      responseScanTimerRef.current = window.setInterval(() => {
+        if (responseCameraRunRef.current === runId) {
+          scanReceiverFrame({ quiet: true });
+        }
+      }, SCAN_INTERVAL_MS);
+    } catch (cameraError) {
+      if (stream !== null) {
+        releaseResponseStream(stream);
+      }
+      if (responseCameraRunRef.current !== runId) {
+        return;
+      }
+      stopResponseCamera();
+      setCameraMessage('Camera unavailable. Paste receiver payload manually.');
+      setError(getCameraAccessErrorMessage(cameraError));
+    }
+  }
 
   async function handleFile(file: File): Promise<void> {
     const runId = prepareRunRef.current + 1;
     prepareRunRef.current = runId;
     setError('');
-    stopStream();
+    stopRound();
     setQrUrl('');
     setFrameIndex(0);
     setFrameCount(0);
     setPhase('idle');
     setStatus('Preparing sender transfer...');
+    lastReceiverPayloadRef.current = '';
 
     try {
       if (file.size > MAX_FILE_SIZE_BYTES) {
@@ -183,75 +302,113 @@ function SendPanel() {
       if (prepareRunRef.current !== runId) {
         return;
       }
-      setTransfer(nextTransfer);
-      startStream(
+      setCurrentTransfer(nextTransfer);
+      void startResponseCamera();
+      startPacketRound(
         nextTransfer.packets,
-        'streaming',
-        `${nextTransfer.manifest.fileName} is streaming as ${nextTransfer.manifest.totalChunks} data chunks.`,
+        'sending',
+        `Sending ${nextTransfer.manifest.fileName}: ${nextTransfer.manifest.totalChunks} data chunks in this round.`,
       );
     } catch (prepareError) {
       if (prepareRunRef.current !== runId) {
         return;
       }
-      setTransfer(null);
+      setCurrentTransfer(null);
       setStatus('Choose a file up to 1MB.');
       const text = getErrorText(prepareError);
       setError(text === 'File is larger than the 1MB MVP limit.' ? text : `Could not prepare file: ${text}`);
     }
   }
 
-  function handleReceiverPayload(): void {
-    if (transfer === null) {
-      setError('Choose a file before applying receiver payloads.');
-      return;
+  function applyReceiverPayload(payloadText: string, source: 'manual' | 'scan'): boolean {
+    const currentTransfer = transferRef.current;
+    if (currentTransfer === null) {
+      if (source === 'manual') {
+        setError('Choose a file before applying receiver payloads.');
+      }
+      return false;
     }
 
-    const payloadText = receiverPayload.trim();
     if (payloadText.length === 0) {
-      setError('Paste an ACK or NACK payload first.');
-      return;
+      if (source === 'manual') {
+        setError('Paste an ACK or NACK payload first.');
+      }
+      return false;
+    }
+
+    if (source === 'scan' && payloadText === lastReceiverPayloadRef.current && timerRef.current !== null) {
+      return false;
     }
 
     try {
       const packet = decodePacket(payloadText);
       if (packet.type === 'ack') {
-        if (packet.transferId !== transfer.manifest.transferId) {
-          setError('ACK transfer ID does not match this sender transfer.');
-          return;
+        if (packet.transferId !== currentTransfer.manifest.transferId) {
+          if (source === 'manual') {
+            setError('ACK transfer ID does not match this sender transfer.');
+          }
+          return false;
         }
-        if (packet.sha256 !== transfer.manifest.sha256) {
-          setError('ACK hash does not match this sender transfer.');
-          return;
+        if (packet.sha256 !== currentTransfer.manifest.sha256) {
+          if (source === 'manual') {
+            setError('ACK hash does not match this sender transfer.');
+          }
+          return false;
         }
 
-        stopStream();
+        lastReceiverPayloadRef.current = payloadText;
+        stopRound();
+        stopResponseCamera();
         setPhase('complete');
+        setQrUrl('');
         setStatus('Transfer complete. Receiver verified SHA-256.');
+        setCameraMessage('Receiver ACK scanned. Camera stopped.');
         setReceiverPayload('');
         setError('');
-        return;
+        return true;
       }
 
       if (packet.type === 'nack') {
-        const repairPackets = selectRepairPacketsForNack(transfer, packet);
-        if (repairPackets.length === 0) {
-          setError('NACK did not request any repair chunks.');
-          return;
+        if (source === 'scan' && timerRef.current !== null) {
+          setCameraMessage('Receiver NACK scanned. Finishing the current QR round before repair.');
+          setError('');
+          return false;
         }
 
-        startStream(
+        const repairPackets = selectRepairPacketsForNack(currentTransfer, packet);
+        if (repairPackets.length === 0) {
+          if (source === 'manual') {
+            setError('NACK did not request any repair chunks.');
+          }
+          return false;
+        }
+
+        lastReceiverPayloadRef.current = payloadText;
+        startPacketRound(
           repairPackets,
           'repairing',
-          `Streaming ${repairPackets.length} repair ${repairPackets.length === 1 ? 'frame' : 'frames'}.`,
+          `Sending ${repairPackets.length} requested repair ${repairPackets.length === 1 ? 'frame' : 'frames'}.`,
         );
+        setCameraMessage('Receiver NACK scanned. Sending requested repair frames.');
         setReceiverPayload('');
-        return;
+        setError('');
+        return true;
       }
 
-      setError('Paste an ACK or NACK packet from the receiver.');
+      if (source === 'manual') {
+        setError('Paste an ACK or NACK packet from the receiver.');
+      }
+      return false;
     } catch (payloadError) {
-      setError(`Could not use receiver payload: ${getErrorText(payloadError)}`);
+      if (source === 'manual') {
+        setError(`Could not use receiver payload: ${getErrorText(payloadError)}`);
+      }
+      return false;
     }
+  }
+
+  function handleReceiverPayload(): void {
+    applyReceiverPayload(receiverPayload.trim(), 'manual');
   }
 
   return (
@@ -259,7 +416,7 @@ function SendPanel() {
       <div className="panelHeader">
         <p className="eyebrow">Send mode</p>
         <h2 id="sender-title">Sender</h2>
-        <p className="subtitle">Choose one file and show the QR stream to the receiver camera.</p>
+        <p className="subtitle">Choose one file. This side sends one QR round, scans the receiver result QR, and repairs automatically.</p>
       </div>
 
       <label className="fileDrop">
@@ -290,9 +447,30 @@ function SendPanel() {
         Phase: {getSenderPhaseLabel(phase)}
       </p>
 
+      <div className="cameraPanel">
+        <span className="fieldTitle">Receiver result camera</span>
+        <span className="fieldHint">{cameraMessage}</span>
+        <video className="cameraPreview compactPreview" ref={responseVideoRef} muted playsInline />
+        <canvas ref={responseCanvasRef} hidden />
+        <div className="controls twoUp" aria-label="Sender camera controls">
+          <button type="button" onClick={() => void startResponseCamera()}>
+            Start camera
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              stopResponseCamera();
+              setCameraMessage('Sender camera stopped. Paste receiver payload manually or restart camera.');
+            }}
+          >
+            Stop camera
+          </button>
+        </div>
+      </div>
+
       <div className="payloadPanel">
         <label className="fieldTitle" htmlFor="receiver-payload">
-          ACK/NACK payload
+          Manual ACK/NACK fallback
         </label>
         <textarea
           id="receiver-payload"
@@ -335,6 +513,7 @@ function ReceivePanel() {
   const receiverStateRef = useRef(receiverState);
   const receiverVersionRef = useRef(0);
   const verifyRunRef = useRef(0);
+  const autoVerifyTimerRef = useRef<number | null>(null);
 
   const progress = useMemo(() => getReceiverProgress(receiverState), [receiverState]);
 
@@ -343,8 +522,9 @@ function ReceivePanel() {
     if (streamRef.current === stream) {
       streamRef.current = null;
     }
-    if (videoRef.current?.srcObject === stream) {
-      videoRef.current.srcObject = null;
+    const video = videoRef.current;
+    if (video?.srcObject === stream) {
+      video.srcObject = null;
     }
   }, []);
 
@@ -388,9 +568,35 @@ function ReceivePanel() {
     return receiverVersionRef.current === receiverVersion && verifyRunRef.current === verifyRunId;
   }
 
+  function clearAutoVerifyTimer(): void {
+    if (autoVerifyTimerRef.current !== null) {
+      window.clearTimeout(autoVerifyTimerRef.current);
+      autoVerifyTimerRef.current = null;
+    }
+  }
+
+  function scheduleAutoVerify(nextState: ReceiverState): void {
+    clearAutoVerifyTimer();
+    const nextProgress = getReceiverProgress(nextState);
+    if (nextState.manifest === null || nextProgress.totalChunks === 0) {
+      return;
+    }
+
+    if (nextProgress.missingChunks === 0) {
+      void verifyTransfer(nextState, 'auto-complete');
+      return;
+    }
+
+    autoVerifyTimerRef.current = window.setTimeout(() => {
+      autoVerifyTimerRef.current = null;
+      void verifyTransfer(receiverStateRef.current, 'auto-settled');
+    }, RECEIVER_SETTLE_MS);
+  }
+
   useEffect(
     () => () => {
       stopCameraTracks();
+      clearAutoVerifyTimer();
       if (downloadUrlRef.current !== null) {
         URL.revokeObjectURL(downloadUrlRef.current);
         downloadUrlRef.current = null;
@@ -422,6 +628,7 @@ function ReceivePanel() {
       if (nextState !== receiverStateRef.current) {
         setNextReceiverState(nextState);
         clearVerificationResult();
+        scheduleAutoVerify(nextState);
       }
       setMessage(`Read ${packet.type} packet.`);
       setError('');
@@ -477,14 +684,18 @@ function ReceivePanel() {
     }
   }
 
-  async function verifyTransfer(): Promise<void> {
+  useEffect(() => {
+    void startCamera();
+  }, []);
+
+  async function verifyTransfer(stateOverride?: ReceiverState, mode: 'manual' | 'auto-complete' | 'auto-settled' = 'manual'): Promise<void> {
     setError('');
     const receiverVersion = receiverVersionRef.current;
     const verifyRunId = verifyRunRef.current + 1;
     verifyRunRef.current = verifyRunId;
 
     try {
-      const currentState = receiverStateRef.current;
+      const currentState = stateOverride ?? receiverStateRef.current;
       const result = await verifyReceiverState(currentState);
       const payload = encodePacket(result);
       const nextQrUrl = await renderQrDataUrl(payload);
@@ -506,7 +717,7 @@ function ReceivePanel() {
           downloadUrlRef.current = url;
           setDownload({ url, name: file.fileName });
         }
-        setMessage('Verified. Show ACK to sender.');
+        setMessage(mode === 'manual' ? 'Verified. Show ACK to sender.' : 'Verified automatically. Show ACK to sender.');
         return;
       }
 
@@ -514,7 +725,7 @@ function ReceivePanel() {
       setResultQrUrl(nextQrUrl);
       setResultType(result.type);
       clearDownload();
-      setMessage('Repair needed. Show NACK to sender.');
+      setMessage(mode === 'manual' ? 'Repair needed. Show NACK to sender.' : 'Missing chunks detected. Show NACK to sender.');
     } catch (verifyError) {
       if (!isCurrentVerification(receiverVersion, verifyRunId)) {
         return;
@@ -533,7 +744,7 @@ function ReceivePanel() {
       <div className="panelHeader">
         <p className="eyebrow">Receive mode</p>
         <h2 id="receiver-title">{message}</h2>
-        <p className="subtitle">Scan sender frames, verify the file, then show the result QR back to the sender.</p>
+        <p className="subtitle">Keep the camera on the sender. This side verifies automatically and shows ACK or NACK QR.</p>
       </div>
 
       <div className="controls" aria-label="Camera controls">
@@ -544,7 +755,7 @@ function ReceivePanel() {
           Scan one frame
         </button>
         <button type="button" onClick={() => void verifyTransfer()}>
-          Verify
+          Verify now
         </button>
         <button type="button" onClick={stopCamera}>
           Stop camera
@@ -592,10 +803,12 @@ function getSenderPhaseLabel(phase: SenderPhase): string {
   switch (phase) {
     case 'idle':
       return 'Idle';
-    case 'streaming':
-      return 'Streaming file frames';
+    case 'sending':
+      return 'Sending data round';
+    case 'waiting':
+      return 'Waiting for receiver QR';
     case 'repairing':
-      return 'Streaming repair frames';
+      return 'Sending repair round';
     case 'complete':
       return 'Complete';
   }

@@ -16,7 +16,7 @@ export class CameraAccessError extends Error {
 const cameraConstraints: MediaStreamConstraints = {
   audio: false,
   video: {
-    facingMode: 'environment',
+    facingMode: 'user',
   },
 };
 

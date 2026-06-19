@@ -227,3 +227,21 @@ Result: Browser verification passed in the in-app browser against the running Vi
 - [x] Verify `npm test` and GitHub Actions-style `npm run build` after deployment config changes
 
 Result: GitHub Pages setup files were added. Verification under Node 20.20.2 passed: `npm test` exited 0 with 12 files and 85 tests passing; `GITHUB_ACTIONS=true GITHUB_REPOSITORY=seren/CameraFileShareing npm run build` exited 0 and produced `/CameraFileShareing/assets/...` URLs in `dist/index.html`. The user still needs to create a GitHub repository and push this branch to `main`.
+
+## Automatic QR Handshake UX
+
+- [x] Change sender file selection to prepare and auto-run one outbound data round instead of looping forever
+- [x] Add sender-side camera scanning for receiver ACK/NACK QR packets
+- [x] On ACK, stop sender QR and camera scanning and mark transfer complete
+- [x] On NACK, stream only requested repair packets for one round, then wait for the next receiver result QR
+- [x] Keep manual ACK/NACK paste as a fallback, but make scan-first flow the primary path
+- [x] Make receiver automatically verify after ingesting all chunks and keep showing ACK/NACK QR
+- [x] Update App behavior tests for one-round sender flow, scanned NACK repair, scanned ACK completion, and receiver auto verify
+- [x] Verify browser UI
+- [x] Verify `npm test` and `npm run build`
+
+Design note: the existing packet protocol stays unchanged. The UI should behave like two devices are held facing each other: sender shows a finite QR round while also scanning receiver result QR; receiver continuously scans sender data and displays ACK/NACK after verification. Receiver NACK scans do not interrupt an active sender round; once the round finishes, the same NACK can trigger a repair round if the receiver still shows it.
+
+Result: targeted verification under Node 20.20.2 passed. `npm test -- src/App.test.tsx` exited 0 with 1 file and 13 tests passing. Full verification under Node 20.20.2 also passed: `npm test` exited 0 with 12 files and 89 tests passing; `npm run build` exited 0; `GITHUB_ACTIONS=true GITHUB_REPOSITORY=serendip811/CameraFileShareing npm run build` exited 0.
+
+Browser result: in-app browser verification passed for desktop and 390px mobile. Sender shows file input, receiver-result camera preview, and manual ACK/NACK fallback; receiver shows camera controls and auto-verification copy; 390px mobile entered `Scanning QR frames`; browser console error logs were empty. Actual physical two-device transfer remains the remaining manual hardware check.
