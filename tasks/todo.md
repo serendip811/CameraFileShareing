@@ -35,6 +35,21 @@
   - [x] Commit `src/protocol` changes
   - [x] Spec compliance review passed after malformed range fix
   - [x] Code quality re-review passed after validation hardening
+- [x] Implement Task 3 packet codec and file manifest
+  - [x] Add packet codec tests and confirm they fail before implementation
+  - [x] Implement packet encoding/decoding with strict QR input validation
+  - [x] Add file manifest tests and confirm they fail before implementation
+  - [x] Implement manifest helpers with strict chunk-size and MVP file-limit checks
+  - [x] Verify targeted Task 3 tests, full protocol tests, and production build under Node 20.20.2
+  - [x] Commit Task 3 protocol files
+- [x] Fix Task 3 code quality review issues
+  - [x] Add red tests for manifest chunk invariants, zero-byte policy, canonical payloads, NACK syntax-only validation, transfer IDs, and metadata hygiene
+  - [x] Add shared protocol validation for transfer IDs, file names, MIME types, chunk count consistency, and NACK range syntax
+  - [x] Apply shared validation in packet decode and manifest creation
+  - [x] Verify targeted Task 3 tests, full protocol tests, and production build under Node 20.20.2
+  - [x] Commit protocol changes only with `fix: harden packet manifest validation`
+  - [x] Spec compliance review passed
+  - [x] Code quality re-review passed with no Critical, Important, or Minor issues
 - [ ] Build the approved MVP
 - [ ] Verify transfer behavior with repeatable tests
 - [ ] Document results and remaining risks
@@ -48,6 +63,9 @@
 - Task 1 review follow-up target: `npm install`, `npm run build`, and `git status --short` under Node 20.20.2 with generated artifacts ignored.
 - Task 1 review follow-up passed under Node 20.20.2: `npm install` and `npm run build` exited 0; `git status --short` did not show dependency or generated build artifacts.
 - Task 2 protocol primitive tests passed under Node 20.20.2: `npm test -- src/protocol` exited 0 with 4 test files and 9 tests passing. Protocol primitives committed as `dc624f5` (`feat: add transfer protocol primitives`).
+- Task 3 packet codec and file manifest committed as `b770425` (`feat: encode QR transfer packets`). Red checks observed missing `packetCodec` and `fileManifest` modules before implementation. Final verification under Node 20.20.2: `npm test -- src/protocol/packetCodec.test.ts src/protocol/fileManifest.test.ts` exited 0 with 2 files and 18 tests passing; `npm test -- src/protocol` exited 0 with 6 files and 35 tests passing; `npm run build` exited 0.
+- Task 3 code quality review fixes committed as `eff9cef` (`fix: harden packet manifest validation`). Red check showed 10 intended failures across packet and manifest tests. Final verification under Node 20.20.2: `npm test -- src/protocol/packetCodec.test.ts src/protocol/fileManifest.test.ts` exited 0 with 2 files and 27 tests passing; `npm test -- src/protocol` exited 0 with 6 files and 44 tests passing; `npm run build` exited 0.
+- Task 3 review gate passed after `eff9cef`; code quality re-review found no remaining Critical, Important, or Minor issues. Carry-forward for Task 4: validate decoded NACK indexes against the active transfer before selecting repair chunks.
 
 ## Task 2 Missing Range Re-review
 
