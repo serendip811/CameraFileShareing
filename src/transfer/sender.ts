@@ -2,7 +2,14 @@ import { crc32Hex } from '../protocol/checksum';
 import { splitIntoChunks } from '../protocol/chunker';
 import { createManifestFromBytes } from '../protocol/fileManifest';
 import { expandMissingRanges } from '../protocol/missingRanges';
-import { PROTOCOL_VERSION, type DataPacket, type FileManifest, type ManifestPacket, type TransferPacket } from '../protocol/types';
+import {
+  PROTOCOL_VERSION,
+  type DataPacket,
+  type FileManifest,
+  type ManifestPacket,
+  type NackPacket,
+  type TransferPacket,
+} from '../protocol/types';
 
 interface PrepareSenderInput {
   bytes: Uint8Array;
@@ -48,4 +55,11 @@ export async function prepareSenderTransfer(input: PrepareSenderInput): Promise<
 export function selectRepairPackets(transfer: SenderTransfer, missingRanges: string): DataPacket[] {
   const requested = new Set(expandMissingRanges(missingRanges, transfer.manifest.totalChunks));
   return transfer.dataPackets.filter((packet) => requested.has(packet.chunkIndex));
+}
+
+export function selectRepairPacketsForNack(transfer: SenderTransfer, nack: NackPacket): DataPacket[] {
+  if (nack.transferId !== transfer.manifest.transferId) {
+    throw new Error('NACK transfer ID does not match transfer');
+  }
+  return selectRepairPackets(transfer, nack.missingRanges);
 }

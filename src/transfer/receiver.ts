@@ -38,10 +38,21 @@ export function createReceiverState(): ReceiverState {
 
 export function ingestPacket(state: ReceiverState, packet: TransferPacket): ReceiverState {
   if (packet.type === 'manifest') {
+    if (state.manifest === null) {
+      return {
+        manifest: packet,
+        chunks: new Map(),
+        rejectedFrames: state.rejectedFrames,
+      };
+    }
+
+    if (isSameManifest(state.manifest, packet)) {
+      return state;
+    }
+
     return {
-      manifest: packet,
-      chunks: new Map(),
-      rejectedFrames: state.rejectedFrames,
+      ...state,
+      rejectedFrames: state.rejectedFrames + 1,
     };
   }
 
@@ -80,17 +91,17 @@ export async function verifyReceiverState(state: ReceiverState): Promise<AckPack
 
   const chunks = getOrderedChunks(state);
   if (chunks === null) {
-    return createNack(state.manifest, missing);
+    return createNack(state.manifest, getAllChunkIndexes(state.manifest.totalChunks));
   }
 
   const bytes = tryReassembleChunks(chunks, state.manifest.fileSize);
   if (bytes === null) {
-    return createNack(state.manifest, []);
+    return createNack(state.manifest, getAllChunkIndexes(state.manifest.totalChunks));
   }
 
   const sha256 = await sha256Hex(bytes);
   if (sha256 !== state.manifest.sha256) {
-    return createNack(state.manifest, []);
+    return createNack(state.manifest, getAllChunkIndexes(state.manifest.totalChunks));
   }
 
   return {
@@ -161,6 +172,22 @@ function isExpectedDataPacket(manifest: FileManifest, packet: DataPacket): boole
     packet.chunkIndex >= 0 &&
     packet.chunkIndex < manifest.totalChunks
   );
+}
+
+function isSameManifest(current: FileManifest, incoming: FileManifest): boolean {
+  return (
+    incoming.transferId === current.transferId &&
+    incoming.fileName === current.fileName &&
+    incoming.mimeType === current.mimeType &&
+    incoming.fileSize === current.fileSize &&
+    incoming.chunkSize === current.chunkSize &&
+    incoming.totalChunks === current.totalChunks &&
+    incoming.sha256 === current.sha256
+  );
+}
+
+function getAllChunkIndexes(totalChunks: number): number[] {
+  return Array.from({ length: totalChunks }, (_, index) => index);
 }
 
 function tryReassembleChunks(chunks: Uint8Array[], fileSize: number): Uint8Array | null {

@@ -50,7 +50,7 @@
   - [x] Commit protocol changes only with `fix: harden packet manifest validation`
   - [x] Spec compliance review passed
   - [x] Code quality re-review passed with no Critical, Important, or Minor issues
-- [ ] Implement Task 4 sender and receiver transfer state
+- [x] Implement Task 4 sender and receiver transfer state
   - [x] Review current protocol constraints from Task 3
   - [x] Add sender transfer tests and confirm RED
   - [x] Implement sender preparation and bounded repair packet selection
@@ -101,3 +101,26 @@ Result: Task 2 missing range parser is spec compliant after `bd0b858`; malformed
 Result: Code quality review fixes verified under Node 20.20.2. `npm test -- src/protocol` exited 0 with 4 files and 17 tests passing; `npm run build` exited 0 after TypeScript checks and Vite production build.
 
 Task 2 review gate passed with no Critical or Important issues after `efedd49` (`fix: harden protocol primitive validation`).
+
+## Task 4 Code Quality Review
+
+- [x] Inspect `96562c1..0865b4e` diff and changed transfer files
+- [x] Check sender repair packet selection for bounded expansion and context validation
+- [x] Check receiver repeated manifest handling, rejection accounting, NACK behavior, verification, and build output flow
+- [x] Run targeted tests/build for transfer state changes
+- [x] Record review findings and readiness assessment
+
+Result: Task 4 code quality review found one Critical issue and multiple Important follow-ups. Verification still passed under Node 20.20.2: `npm test -- src/transfer` exited 0 with 2 files and 8 tests passing; `npm test -- src/protocol src/transfer` exited 0 with 8 files and 52 tests passing; `npm run build` exited 0. Readiness: not ready for Task 5 until repeated manifest handling is fixed.
+
+## Task 4 Code Quality Review Fixes
+
+- [x] Add RED tests for repeated manifests, conflicting manifests, actionable verification-failure NACKs, NACK transfer ID validation, and repair loops
+- [x] Preserve receiver progress across identical repeated manifests
+- [x] Reject conflicting manifests without switching transfers
+- [x] Request all chunks when hash verification or reassembly fails
+- [x] Add sender NACK-aware repair selection with transfer ID validation
+- [x] Verify `npm test -- src/transfer` under Node 20.20.2
+- [x] Verify `npm test -- src/protocol src/transfer` under Node 20.20.2
+- [x] Verify `npm run build` under Node 20.20.2
+
+Result: Task 4 review fixes verified under Node 20.20.2. RED checks showed 8 intended transfer test failures before implementation. Final verification: `npm test -- src/transfer` exited 0 with 2 files and 15 tests passing; `npm test -- src/protocol src/transfer` exited 0 with 8 files and 59 tests passing; `npm run build` exited 0.
