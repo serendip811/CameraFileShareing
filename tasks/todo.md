@@ -217,3 +217,13 @@ Result: targeted verification under Node 20.20.2 passed. `npm test -- src/transf
 - [ ] Run physical two-device camera transfer with a phone and MacBook
 
 Result: Browser verification passed in the in-app browser against the running Vite dev server. Desktop and 390px mobile checks showed no horizontal overflow; Send and Receive controls were present; browser error logs were empty. Automated packet-flow proof passed with `npm test` covering the NACK repair simulation. Physical two-device camera verification remains a manual follow-up because this environment cannot aim a phone camera at a MacBook screen or accept browser camera permission prompts on the user's behalf.
+
+## GitHub Pages Deployment Setup
+
+- [x] Add GitHub Actions workflow to test, build, and deploy `dist/` to Pages
+- [x] Configure Vite `base` automatically from `GITHUB_REPOSITORY` during GitHub Actions builds
+- [x] Add `.nojekyll` marker for Pages static output
+- [x] Document repository creation, push, and Pages settings steps in README
+- [x] Verify `npm test` and GitHub Actions-style `npm run build` after deployment config changes
+
+Result: GitHub Pages setup files were added. Verification under Node 20.20.2 passed: `npm test` exited 0 with 12 files and 85 tests passing; `GITHUB_ACTIONS=true GITHUB_REPOSITORY=seren/CameraFileShareing npm run build` exited 0 and produced `/CameraFileShareing/assets/...` URLs in `dist/index.html`. The user still needs to create a GitHub repository and push this branch to `main`.

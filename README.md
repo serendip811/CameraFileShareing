@@ -21,6 +21,26 @@ Open the dev URL on two devices. Use `Send` on the device with the file and `Rec
 
 Camera access requires HTTPS or localhost. For phone-to-laptop testing on a LAN, use an HTTPS tunnel or a local HTTPS setup if the phone browser blocks camera access on plain HTTP.
 
+## Deploy to GitHub Pages
+
+This repo includes `.github/workflows/deploy-pages.yml`. The workflow runs tests, builds the Vite app, and deploys `dist/` to GitHub Pages on pushes to `main`.
+
+After creating an empty GitHub repository:
+
+```bash
+git remote add origin git@github.com:<your-user>/<your-repo>.git
+git push -u origin codex/qr-transfer-mvp:main
+```
+
+Then open the GitHub repository settings:
+
+1. Go to `Settings` -> `Pages`.
+2. Set `Source` to `GitHub Actions`.
+3. Wait for the `Deploy to GitHub Pages` action to finish.
+4. Open `https://<your-user>.github.io/<your-repo>/`.
+
+The Vite `base` path is set automatically in GitHub Actions from the repository name, so project-site URLs such as `/CameraFileShareing/` work without hard-coding the repo name.
+
 ## Verify
 
 ```bash
