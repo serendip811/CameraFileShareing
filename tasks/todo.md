@@ -50,6 +50,16 @@
   - [x] Commit protocol changes only with `fix: harden packet manifest validation`
   - [x] Spec compliance review passed
   - [x] Code quality re-review passed with no Critical, Important, or Minor issues
+- [ ] Implement Task 4 sender and receiver transfer state
+  - [x] Review current protocol constraints from Task 3
+  - [x] Add sender transfer tests and confirm RED
+  - [x] Implement sender preparation and bounded repair packet selection
+  - [x] Add receiver transfer tests and confirm RED
+  - [x] Implement receiver ingest, progress, verification, and file output
+  - [x] Verify `npm test -- src/transfer` under Node 20.20.2
+  - [x] Verify `npm test -- src/protocol src/transfer` under Node 20.20.2
+  - [x] Verify `npm run build` under Node 20.20.2
+  - [x] Commit Task 4 transfer files
 - [ ] Build the approved MVP
 - [ ] Verify transfer behavior with repeatable tests
 - [ ] Document results and remaining risks
@@ -66,6 +76,8 @@
 - Task 3 packet codec and file manifest committed as `b770425` (`feat: encode QR transfer packets`). Red checks observed missing `packetCodec` and `fileManifest` modules before implementation. Final verification under Node 20.20.2: `npm test -- src/protocol/packetCodec.test.ts src/protocol/fileManifest.test.ts` exited 0 with 2 files and 18 tests passing; `npm test -- src/protocol` exited 0 with 6 files and 35 tests passing; `npm run build` exited 0.
 - Task 3 code quality review fixes committed as `eff9cef` (`fix: harden packet manifest validation`). Red check showed 10 intended failures across packet and manifest tests. Final verification under Node 20.20.2: `npm test -- src/protocol/packetCodec.test.ts src/protocol/fileManifest.test.ts` exited 0 with 2 files and 27 tests passing; `npm test -- src/protocol` exited 0 with 6 files and 44 tests passing; `npm run build` exited 0.
 - Task 3 review gate passed after `eff9cef`; code quality re-review found no remaining Critical, Important, or Minor issues. Carry-forward for Task 4: validate decoded NACK indexes against the active transfer before selecting repair chunks.
+- Task 4 sender/receiver transfer state: RED check under Node 20.20.2 showed missing `sender` and `receiver` modules before implementation. Final verification under Node 20.20.2: `npm test -- src/transfer` exited 0 with 2 files and 8 tests passing; `npm test -- src/protocol src/transfer` exited 0 with 8 files and 52 tests passing; `npm run build` exited 0.
+- Task 4 self-review: sender repair selection bounds NACK expansion by `manifest.totalChunks`; receiver rejects active-transfer mismatches without storing chunks; complete hash mismatch returns NACK with empty `missingRanges`; `buildVerifiedFile` only returns bytes after ACK verification.
 
 ## Task 2 Missing Range Re-review
 
