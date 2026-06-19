@@ -5,18 +5,19 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "tsc -b tsconfig.json tsconfig.node.json && vite build",
+    "build": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.node.json && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "test:watch": "vitest"
   },
+  "engines": {
+    "node": ">=20.20.2"
+  },
   "dependencies": {
-    "@vitejs/plugin-react": "^6.0.2",
     "jsqr": "^1.4.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.7",
-    "react-dom": "^19.2.7",
-    "vite": "^8.0.16"
+    "react-dom": "^19.2.7"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",
@@ -25,8 +26,10 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
     "jsdom": "^29.1.1",
     "typescript": "^6.0.3",
+    "vite": "^8.0.16",
     "vitest": "^4.1.9"
   }
 }
