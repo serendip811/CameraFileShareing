@@ -10,6 +10,8 @@ describe('chunker', () => {
   });
 
   it('rejects invalid chunk sizes', () => {
-    expect(() => splitIntoChunks(new Uint8Array([1]), 0)).toThrow('Chunk size must be positive');
+    for (const chunkSize of [0, Number.NaN, Number.POSITIVE_INFINITY, 1.5]) {
+      expect(() => splitIntoChunks(new Uint8Array([1]), chunkSize)).toThrow('Chunk size must be a positive integer');
+    }
   });
 });

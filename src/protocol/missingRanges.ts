@@ -12,7 +12,12 @@ export function encodeMissingRanges(indexes: number[]): string {
   if (indexes.length === 0) {
     return '';
   }
-  const sorted = [...indexes].sort((a, b) => a - b);
+  for (const index of indexes) {
+    if (!Number.isInteger(index) || index < 0) {
+      throw new Error(`Invalid missing index: ${index}`);
+    }
+  }
+  const sorted = [...new Set(indexes)].sort((a, b) => a - b);
   const ranges: string[] = [];
   let start = sorted[0];
   let previous = sorted[0];
@@ -29,9 +34,12 @@ export function encodeMissingRanges(indexes: number[]): string {
   return ranges.join(',');
 }
 
-export function expandMissingRanges(value: string): number[] {
-  if (value.trim() === '') {
+export function expandMissingRanges(value: string, maxExclusive?: number): number[] {
+  if (value === '') {
     return [];
+  }
+  if (maxExclusive !== undefined && (!Number.isInteger(maxExclusive) || maxExclusive < 0)) {
+    throw new Error(`Invalid missing range: ${value}`);
   }
   return value.split(',').flatMap((part) => {
     const match = /^(\d+)(?:-(\d+))?$/.exec(part);
@@ -41,7 +49,7 @@ export function expandMissingRanges(value: string): number[] {
     const [, startText, endText] = match;
     const start = Number(startText);
     const end = endText === undefined ? start : Number(endText);
-    if (end < start) {
+    if (end < start || (maxExclusive !== undefined && end >= maxExclusive)) {
       throw new Error(`Invalid missing range: ${part}`);
     }
     return Array.from({ length: end - start + 1 }, (_, offset) => start + offset);

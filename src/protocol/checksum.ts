@@ -19,6 +19,8 @@ export function crc32Hex(bytes: Uint8Array): string {
 }
 
 export async function sha256Hex(bytes: Uint8Array): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  const digestBytes = new Uint8Array(bytes.byteLength);
+  digestBytes.set(bytes);
+  const digest = await crypto.subtle.digest('SHA-256', digestBytes);
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }

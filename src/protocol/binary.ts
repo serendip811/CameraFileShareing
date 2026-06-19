@@ -17,6 +17,10 @@ export function base64UrlDecode(value: string): Uint8Array {
 }
 
 export function concatChunks(chunks: Uint8Array[], totalBytes: number): Uint8Array {
+  const actualBytes = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0);
+  if (actualBytes !== totalBytes) {
+    throw new Error('Chunk byte total does not match totalBytes');
+  }
   const output = new Uint8Array(totalBytes);
   let offset = 0;
   for (const chunk of chunks) {

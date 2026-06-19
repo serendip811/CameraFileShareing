@@ -1,8 +1,8 @@
 import { concatChunks } from './binary';
 
 export function splitIntoChunks(bytes: Uint8Array, chunkSize: number): Uint8Array[] {
-  if (chunkSize <= 0) {
-    throw new Error('Chunk size must be positive');
+  if (!Number.isInteger(chunkSize) || chunkSize <= 0) {
+    throw new Error('Chunk size must be a positive integer');
   }
   const chunks: Uint8Array[] = [];
   for (let offset = 0; offset < bytes.byteLength; offset += chunkSize) {

@@ -11,4 +11,12 @@ describe('binary helpers', () => {
     const output = concatChunks([new Uint8Array([1, 2]), new Uint8Array([3])], 3);
     expect(Array.from(output)).toEqual([1, 2, 3]);
   });
+
+  it('rejects chunks with fewer bytes than the expected total', () => {
+    expect(() => concatChunks([new Uint8Array([1, 2])], 3)).toThrow('Chunk byte total does not match totalBytes');
+  });
+
+  it('rejects chunks with more bytes than the expected total', () => {
+    expect(() => concatChunks([new Uint8Array([1, 2, 3])], 2)).toThrow('Chunk byte total does not match totalBytes');
+  });
 });
