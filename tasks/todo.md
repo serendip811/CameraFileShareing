@@ -83,9 +83,9 @@
   - [x] Expand responsive UI styles
   - [x] Verify `npm test -- src/App.test.tsx`, `npm test`, and `npm run build` under Node 20.20.2
   - [x] Commit Task 6 UI changes
-- [ ] Build the approved MVP
+- [x] Build the approved MVP
 - [x] Verify transfer behavior with repeatable tests
-- [ ] Document results and remaining risks
+- [x] Document results and remaining risks
 
 ## Review
 
@@ -201,6 +201,19 @@ Result: Task 6 re-review found a remaining Critical race where an old `startCame
 - [x] Verify repaired transfer reaches ACK and rebuilds the original file bytes
 - [x] Add README with run commands, MVP limits, HTTPS camera note, and manual verification checklist
 - [x] Verify `npm test` and `npm run build` under Node 20.20.2
-- [ ] Commit Task 7 simulation and docs
+- [x] Commit Task 7 simulation and docs
 
-Result so far: targeted verification under Node 20.20.2 passed. `npm test -- src/transfer/simulation.test.ts` exited 0 with 1 file and 1 test passing. Full verification under Node 20.20.2 also passed: `npm test` exited 0 with 12 files and 85 tests passing; `npm run build` exited 0.
+Result: targeted verification under Node 20.20.2 passed. `npm test -- src/transfer/simulation.test.ts` exited 0 with 1 file and 1 test passing. Full verification under Node 20.20.2 also passed: `npm test` exited 0 with 12 files and 85 tests passing; `npm run build` exited 0. Task 7 was committed as `0c10b6d` (`test: add QR transfer repair simulation`).
+
+## Task 8 Browser Verification
+
+- [x] Confirm dev server responds at `http://127.0.0.1:5173/`
+- [x] Verify browser home screen shows `Send` and `Receive`
+- [x] Verify desktop Send screen shows file input, ACK/NACK payload input, and idle phase
+- [x] Verify desktop Receive screen shows camera controls, preview area, and receiver progress
+- [x] Verify 390px mobile Home, Send, and Receive screens have no horizontal overflow
+- [x] Verify browser console has no captured error logs
+- [x] Record automated transfer simulation as packet-flow correctness proof
+- [ ] Run physical two-device camera transfer with a phone and MacBook
+
+Result: Browser verification passed in the in-app browser against the running Vite dev server. Desktop and 390px mobile checks showed no horizontal overflow; Send and Receive controls were present; browser error logs were empty. Automated packet-flow proof passed with `npm test` covering the NACK repair simulation. Physical two-device camera verification remains a manual follow-up because this environment cannot aim a phone camera at a MacBook screen or accept browser camera permission prompts on the user's behalf.
