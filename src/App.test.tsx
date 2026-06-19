@@ -197,7 +197,9 @@ describe('App', () => {
 
     await goToReceiveMode();
 
-    expect(await screen.findByText(/Ready for hello\.txt/)).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Ready for hello.txt. Requesting 2 chunks.' }),
+    ).toBeInTheDocument();
     expect(screen.getByText('Chunk request')).toBeInTheDocument();
     const request = getRenderedChunkRequest();
     expect(request).toMatchObject({ transferId: offer.transferId, missingRanges: '0-1' });
@@ -339,14 +341,14 @@ describe('App', () => {
       secondRead.resolve(new Uint8Array([98]).buffer);
       await secondRead.promise;
     });
-    expect(await screen.findByText(/second\.txt is ready/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/second\.txt is ready/)).length).toBeGreaterThan(0);
 
     await act(async () => {
       firstRead.resolve(new Uint8Array([97]).buffer);
       await firstRead.promise;
     });
 
-    expect(screen.getByText(/second\.txt is ready/)).toBeInTheDocument();
+    expect(screen.getAllByText(/second\.txt is ready/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/first\.txt is ready/)).not.toBeInTheDocument();
   });
 
@@ -355,16 +357,16 @@ describe('App', () => {
 
     await userEvent.upload(screen.getByLabelText('Choose file to send'), new File(['hi'], 'round.txt', { type: 'text/plain' }));
 
-    expect(await screen.findByText(/round\.txt is ready/)).toBeInTheDocument();
-    expect(screen.getByText('Phase: Offering file')).toBeInTheDocument();
+    expect((await screen.findAllByText(/round\.txt is ready/)).length).toBeGreaterThan(0);
+    expect(screen.getByText(/Phase: Offering file/)).toBeInTheDocument();
     const offer = getRenderedOfferPacket();
     expect(offer.fileName).toBe('round.txt');
     expect(() => getRenderedManifestPacket()).toThrow('Expected rendered manifest packet');
 
     mocks.decodeQrFromImageData.mockReturnValueOnce(encodeChunkRequest(offer.transferId, '0')).mockReturnValue(null);
 
-    expect(await screen.findByText(/Sending 1 requested chunk/)).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('Phase: Waiting for receiver request')).toBeInTheDocument());
+    expect((await screen.findAllByText(/Sending 1 requested chunk/)).length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.getByText(/Phase: Waiting for receiver request/)).toBeInTheDocument());
     expect(getRenderedManifestPacket().transferId).toBe(offer.transferId);
   });
 
@@ -381,7 +383,7 @@ describe('App', () => {
       encodeChunkRequest(offer.transferId, '0'),
     );
 
-    expect(await screen.findByText(/Sending 1 requested chunk/)).toBeInTheDocument();
+    expect((await screen.findAllByText(/Sending 1 requested chunk/)).length).toBeGreaterThan(0);
     expect(screen.getByText(/Receiver request scanned/)).toBeInTheDocument();
   });
 
@@ -392,8 +394,7 @@ describe('App', () => {
     const offer = getRenderedOfferPacket();
 
     mocks.decodeQrFromImageData.mockReturnValueOnce(encodeChunkRequest(offer.transferId, '0')).mockReturnValue(null);
-    expect(await screen.findByText(/Sending 1 requested chunk/)).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText('Phase: Waiting for receiver request')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/Phase: Waiting for receiver request/)).toBeInTheDocument());
 
     mocks.decodeQrFromImageData.mockReturnValue(
       encodePacket({
@@ -405,7 +406,7 @@ describe('App', () => {
     );
 
     expect(await screen.findByText('Transfer complete. Receiver verified SHA-256.')).toBeInTheDocument();
-    expect(screen.getByText('Phase: Complete')).toBeInTheDocument();
+    expect(screen.getByText(/Phase: Complete/)).toBeInTheDocument();
   });
 
   it('rejects oversized sender files before reading bytes', async () => {

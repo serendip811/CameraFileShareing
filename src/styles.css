@@ -64,7 +64,7 @@ textarea:focus-visible {
 
 .workPanel {
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .panelHeader {
@@ -151,11 +151,21 @@ h2 {
 .payloadPanel,
 .cameraPanel {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   border: 1px solid #d7dde0;
   border-radius: 8px;
   background: #fff;
-  padding: 16px;
+  padding: 12px;
+}
+
+.transferSurface {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: stretch;
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
 }
 
 .fieldTitle {
@@ -165,7 +175,7 @@ h2 {
 
 .fieldHint {
   color: #526158;
-  line-height: 1.45;
+  line-height: 1.35;
 }
 
 input[type="file"] {
@@ -185,24 +195,28 @@ input[type="file"] {
 
 .qrStage {
   display: grid;
-  justify-items: start;
-  gap: 10px;
+  gap: 8px;
+  align-content: start;
+  border: 1px solid #d7dde0;
+  border-radius: 8px;
+  background: #fff;
+  padding: 12px;
   color: #526158;
   font-size: 14px;
 }
 
 .qrImage {
-  width: min(72vw, 420px);
+  width: 100%;
   aspect-ratio: 1;
   border: 1px solid #17201a;
   border-radius: 8px;
   background: #fff;
-  padding: 12px;
+  padding: 8px;
 }
 
 .cameraPreview {
   width: 100%;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 1;
   border: 1px solid #17201a;
   border-radius: 8px;
   background: #101510;
@@ -210,12 +224,24 @@ input[type="file"] {
 }
 
 .compactPreview {
-  max-height: 260px;
+  max-height: none;
 }
 
 .statusLine {
   color: #526158;
-  line-height: 1.45;
+  line-height: 1.35;
+}
+
+.emptyVisual {
+  width: 100%;
+  aspect-ratio: 1;
+  border: 1px dashed #aab4b8;
+  border-radius: 8px;
+  background: #eef2f3;
+  color: #526158;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
 }
 
 .srOnly {
@@ -258,15 +284,28 @@ textarea {
 
 @media (max-width: 640px) {
   .appShell {
-    padding: 18px;
+    min-height: 100svh;
+    padding: 10px;
   }
 
   .topBar {
-    margin-bottom: 24px;
+    margin-bottom: 10px;
   }
 
   .heroPanel {
     padding-top: 22px;
+  }
+
+  .workPanel {
+    gap: 9px;
+  }
+
+  .panelHeader {
+    gap: 3px;
+  }
+
+  .eyebrow {
+    font-size: 11px;
   }
 
   h1 {
@@ -274,11 +313,43 @@ textarea {
   }
 
   h2 {
-    font-size: 24px;
+    font-size: 20px;
   }
 
   .subtitle {
-    font-size: 16px;
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  .workPanel .subtitle {
+    display: none;
+  }
+
+  .fileDrop,
+  .cameraPanel,
+  .qrStage {
+    gap: 5px;
+    padding: 8px;
+  }
+
+  .fieldTitle {
+    font-size: 13px;
+  }
+
+  .fieldHint,
+  .statusLine,
+  .qrStage {
+    font-size: 12px;
+  }
+
+  .fileDrop .fieldHint {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .cameraPanel .fieldHint {
+    display: none;
   }
 
   .modeGrid,
@@ -286,8 +357,13 @@ textarea {
     grid-template-columns: 1fr;
   }
 
+  .transferSurface {
+    gap: 8px;
+  }
+
   .qrImage {
     width: 100%;
+    padding: 6px;
   }
 
   .downloadButton {

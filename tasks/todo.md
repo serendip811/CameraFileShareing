@@ -261,3 +261,16 @@ Browser result: in-app browser verification passed for desktop and 390px mobile.
 Design note: sender behaves like a file server and receiver behaves like an HTTP client. Sender advertises metadata with an `offer` QR. Receiver scans the offer and displays a `request` QR for chunk ranges. Sender only emits manifest/data frames after scanning a matching request, then waits for the next request or final ACK. No user-facing Start camera, Scan frame, Verify, or manual payload controls should remain.
 
 Result: HTTP-like QR request/response UX implemented. Verification under Node 20.20.2 passed: `npm test -- src/protocol/controlPacket.test.ts src/App.test.tsx` exited 0 with 2 files and 19 tests passing; full `npm test` exited 0 with 13 files and 95 tests passing; `npm run build` exited 0; `GITHUB_ACTIONS=true GITHUB_REPOSITORY=serendip811/CameraFileShareing npm run build` exited 0. Browser verification passed on desktop and 390px mobile with no horizontal overflow and no console errors; Send/Receive screens no longer expose Start camera, Scan one frame, Verify, Stop camera, manual payload controls, or textareas.
+
+## Compact Mobile Transfer Surface
+
+- [x] Put outgoing QR and camera preview into one compact two-up surface on Send
+- [x] Put receiver camera preview and outgoing request/ACK QR into one compact two-up surface on Receive
+- [x] Add empty QR placeholder so the layout does not jump before the first QR appears
+- [x] Reduce mobile header, panel, QR, camera, and status spacing so the working surface fits in one viewport
+- [x] Preserve desktop readability without making QR/camera oversized
+- [x] Verify App tests, full tests, production build, GitHub Actions build, and browser desktop/mobile layout
+
+Design note: mobile operation should prioritize the two live optical endpoints over explanatory text. Each mode should keep the top status, camera view, and QR view visible together; secondary labels stay short and compact.
+
+Result: compact transfer surface implemented. Verification passed: `npm test -- src/App.test.tsx` exited 0 with 14 tests, full `npm test` exited 0 with 13 files and 95 tests, `npm run build` exited 0, and `GITHUB_ACTIONS=true GITHUB_REPOSITORY=serendip811/CameraFileShareing npm run build` exited 0. Browser layout verification passed at 390x844: Send QR/camera shared one 370x220 surface ending at 400.9px, Receive shared one 370x220 surface ending at 307.2px, and both kept QR/camera on the same row. Desktop 1280x720 verification passed after capping the surface width at 860px; the surface ended at 694.1px with QR/camera on the same row.

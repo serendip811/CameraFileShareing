@@ -10,3 +10,4 @@
 - When guarding async UI lifecycles, a run token is not enough by itself; stale continuations must clean up only the resources they own, and async result writers need a version check after every awaited boundary.
 - For camera-to-screen workflows, file selection must only prepare a transfer, not start optical transmission; add an explicit or QR-confirmed readiness phase so both devices can be physically aligned before data frames move.
 - Model bidirectional QR transfer like HTTP request/response, not broadcast streaming: the receiver should request chunk ranges and the sender should only emit data frames in response to the latest matching request.
+- For mobile camera-to-screen tools, treat camera preview and outgoing QR as a single first-screen workspace; avoid stacking them as separate full-width sections because the physical workflow requires seeing both at once.

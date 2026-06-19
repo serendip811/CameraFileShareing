@@ -463,25 +463,30 @@ function SendPanel() {
         />
       </label>
 
-      {qrUrl !== '' && (
+      <div className="transferSurface" aria-label="Transfer workspace">
         <figure className="qrStage">
-          <img className="qrImage" src={qrUrl} alt="Current transfer QR frame" />
-          <figcaption>
-            QR {frameIndex + 1} of {frameCount}
-          </figcaption>
+          <span className="fieldTitle">Outgoing QR</span>
+          {qrUrl !== '' ? (
+            <img className="qrImage" src={qrUrl} alt="Current transfer QR frame" />
+          ) : (
+            <div className="emptyVisual" aria-hidden="true">
+              Waiting
+            </div>
+          )}
+          <figcaption>{qrUrl !== '' ? `QR ${frameIndex + 1} of ${frameCount}` : getSenderPhaseLabel(phase)}</figcaption>
         </figure>
-      )}
+
+        <div className="cameraPanel">
+          <span className="fieldTitle">Receiver screen</span>
+          <span className="fieldHint">{cameraMessage}</span>
+          <video className="cameraPreview compactPreview" ref={responseVideoRef} muted playsInline />
+          <canvas ref={responseCanvasRef} hidden />
+        </div>
+      </div>
 
       <p className="statusLine" aria-live="polite">
-        Phase: {getSenderPhaseLabel(phase)}
+        Phase: {getSenderPhaseLabel(phase)}. {status}
       </p>
-
-      <div className="cameraPanel">
-        <span className="fieldTitle">Receiver screen camera</span>
-        <span className="fieldHint">{cameraMessage}</span>
-        <video className="cameraPreview compactPreview" ref={responseVideoRef} muted playsInline />
-        <canvas ref={responseCanvasRef} hidden />
-      </div>
 
       {error !== '' && (
         <p className="errorLine" role="alert">
@@ -814,8 +819,26 @@ function ReceivePanel() {
         <p className="subtitle">Keep this camera on the sender screen. This side requests chunks, verifies them, and shows the next QR automatically.</p>
       </div>
 
-      <video className="cameraPreview" ref={videoRef} muted playsInline />
-      <canvas ref={canvasRef} hidden />
+      <div className="transferSurface" aria-label="Transfer workspace">
+        <div className="cameraPanel">
+          <span className="fieldTitle">Sender screen</span>
+          <span className="fieldHint">{message}</span>
+          <video className="cameraPreview" ref={videoRef} muted playsInline />
+          <canvas ref={canvasRef} hidden />
+        </div>
+
+        <figure className="qrStage">
+          <span className="fieldTitle">Outgoing QR</span>
+          {resultQrUrl !== '' ? (
+            <img className="qrImage" src={resultQrUrl} alt={resultType === 'ack' ? 'ACK QR payload' : 'Chunk request QR payload'} />
+          ) : (
+            <div className="emptyVisual" aria-hidden="true">
+              Waiting
+            </div>
+          )}
+          <figcaption>{resultQrUrl !== '' ? (resultType === 'ack' ? 'ACK payload' : 'Chunk request') : 'Request QR'}</figcaption>
+        </figure>
+      </div>
 
       <p className="statusLine" aria-live="polite">
         {offer !== null && receiverState.manifest === null
@@ -828,13 +851,6 @@ function ReceivePanel() {
         <p className="errorLine" role="alert">
           {error}
         </p>
-      )}
-
-      {resultQrUrl !== '' && (
-        <figure className="qrStage">
-          <img className="qrImage" src={resultQrUrl} alt={resultType === 'ack' ? 'ACK QR payload' : 'Chunk request QR payload'} />
-          <figcaption>{resultType === 'ack' ? 'ACK payload' : 'Chunk request'}</figcaption>
-        </figure>
       )}
 
       {download !== null && (
