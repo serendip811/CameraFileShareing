@@ -184,3 +184,13 @@ Result: Task 6 code quality review found one Critical camera lifecycle race, plu
 - [x] Commit Task 6 review fixes
 
 Result: Task 6 review fixes verified under Node 20.20.2. RED check showed 4 intended App test failures before implementation: late camera stream cleanup, stale receiver ACK/download clearing, out-of-order sender file preparation, and oversized file pre-read rejection. Final verification: `npm test -- src/App.test.tsx` exited 0 with 1 file and 8 tests passing; `npm test` exited 0 with 11 files and 82 tests passing; `npm run build` exited 0.
+
+## Task 6 Review Fix Re-review
+
+- [x] Re-review `a30c741..402dd93` for remaining camera and verification lifecycle races
+- [x] Add RED App tests for stale `video.play()` continuation and stale async verification output
+- [x] Stop only the stale camera stream owned by the outdated start run
+- [x] Ignore verification QR/download work that completes after receiver state changes
+- [x] Verify `npm test -- src/App.test.tsx`, `npm test`, and `npm run build` under Node 20.20.2
+
+Result: Task 6 re-review found a remaining Critical race where an old `startCamera()` continuation could stop a newer stream, plus an Important stale async verification result risk. RED check showed 2 intended App test failures before implementation. Final verification: `npm test -- src/App.test.tsx` exited 0 with 1 file and 10 tests passing; `npm test` exited 0 with 11 files and 84 tests passing; `npm run build` exited 0.

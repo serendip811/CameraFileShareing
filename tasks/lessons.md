@@ -7,3 +7,4 @@
 - When hardening protocol decoders, validate cross-field invariants and canonical encodings too; independent field validation can still admit impossible packets or normalized alternate wire forms.
 - When implementing QR transfer state, test the actual looped stream shape: repeated identical manifests must be idempotent, conflicting manifests must be rejected, and verification-failure NACKs must request actionable repair chunks.
 - When wrapping browser hardware APIs, classify environmental failures separately from unsupported capability; mobile LAN HTTP can hide camera APIs because the context is insecure, and UI code needs actionable error codes.
+- When guarding async UI lifecycles, a run token is not enough by itself; stale continuations must clean up only the resources they own, and async result writers need a version check after every awaited boundary.

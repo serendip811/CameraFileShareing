@@ -162,6 +162,31 @@ describe('App', () => {
     expect(screen.getByRole('heading', { name: 'Camera stopped' })).toBeInTheDocument();
   });
 
+  it('does not let a stale camera start stop a newer active stream', async () => {
+    const firstPlay = createDeferred<void>();
+    const firstStream = createMockStream();
+    const secondStream = createMockStream();
+    const playMock = vi.mocked(HTMLMediaElement.prototype.play);
+    playMock.mockReturnValueOnce(firstPlay.promise).mockResolvedValue(undefined);
+    mocks.openCameraStream.mockResolvedValueOnce(firstStream).mockResolvedValueOnce(secondStream);
+
+    await goToReceiveMode();
+    await userEvent.click(screen.getByRole('button', { name: 'Start camera' }));
+    await waitFor(() => expect(playMock).toHaveBeenCalledTimes(1));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Start camera' }));
+    await waitFor(() => expect(playMock).toHaveBeenCalledTimes(2));
+    mocks.stopCameraStream.mockClear();
+
+    await act(async () => {
+      firstPlay.resolve();
+      await firstPlay.promise;
+    });
+
+    expect(mocks.stopCameraStream).not.toHaveBeenCalledWith(secondStream);
+    expect(screen.getByRole('heading', { name: 'Scanning QR frames' })).toBeInTheDocument();
+  });
+
   it('clears receiver verification output and download when another QR packet is ingested', async () => {
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:verified');
     vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
@@ -194,6 +219,42 @@ describe('App', () => {
     expect(screen.queryByDisplayValue(/"type":"ack"/)).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Download verified file' })).not.toBeInTheDocument();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:verified');
+  });
+
+  it('ignores a verification result that finishes after receiver state changes', async () => {
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:stale');
+    const pendingQr = createDeferred<string>();
+    mocks.renderQrDataUrl.mockReturnValueOnce(pendingQr.promise);
+    mocks.captureVideoFrame.mockReturnValue(createImageData());
+    const dataPacket = createDataPacket(0, new Uint8Array([97]), 1);
+    mocks.decodeQrFromImageData
+      .mockReturnValueOnce(
+        encodePacket(
+          createManifestPacket({
+            totalChunks: 1,
+            fileSize: 1,
+            sha256: 'ca978112ca1bbdcafac231b39a23dc4da786eff8147c4e72b9807785afee48bb',
+          }),
+        ),
+      )
+      .mockReturnValueOnce(encodePacket(dataPacket))
+      .mockReturnValueOnce(encodePacket(dataPacket));
+
+    await goToReceiveMode();
+    await userEvent.click(screen.getByRole('button', { name: 'Scan one frame' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Scan one frame' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Verify' }));
+    await waitFor(() => expect(mocks.renderQrDataUrl).toHaveBeenCalledTimes(1));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Scan one frame' }));
+    await act(async () => {
+      pendingQr.resolve('data:image/png;base64,stale');
+      await pendingQr.promise;
+    });
+
+    expect(screen.queryByText('ACK payload')).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue(/"type":"ack"/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Download verified file' })).not.toBeInTheDocument();
   });
 
   it('keeps the latest selected sender file when preparation resolves out of order', async () => {

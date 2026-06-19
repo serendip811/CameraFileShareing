@@ -333,8 +333,20 @@ function ReceivePanel() {
   const downloadUrlRef = useRef<string | null>(null);
   const cameraRunRef = useRef(0);
   const receiverStateRef = useRef(receiverState);
+  const receiverVersionRef = useRef(0);
+  const verifyRunRef = useRef(0);
 
   const progress = useMemo(() => getReceiverProgress(receiverState), [receiverState]);
+
+  const releaseCameraStream = useCallback((stream: MediaStream) => {
+    stopCameraStream(stream);
+    if (streamRef.current === stream) {
+      streamRef.current = null;
+    }
+    if (videoRef.current?.srcObject === stream) {
+      videoRef.current.srcObject = null;
+    }
+  }, []);
 
   const stopCameraTracks = useCallback(() => {
     cameraRunRef.current += 1;
@@ -343,13 +355,12 @@ function ReceivePanel() {
       scanTimerRef.current = null;
     }
     if (streamRef.current !== null) {
-      stopCameraStream(streamRef.current);
-      streamRef.current = null;
+      releaseCameraStream(streamRef.current);
     }
     if (videoRef.current !== null) {
       videoRef.current.srcObject = null;
     }
-  }, []);
+  }, [releaseCameraStream]);
 
   const clearDownload = useCallback(() => {
     if (downloadUrlRef.current !== null) {
@@ -360,6 +371,7 @@ function ReceivePanel() {
   }, []);
 
   const clearVerificationResult = useCallback(() => {
+    verifyRunRef.current += 1;
     setResultPayload('');
     setResultQrUrl('');
     setResultType(null);
@@ -367,8 +379,13 @@ function ReceivePanel() {
   }, [clearDownload]);
 
   function setNextReceiverState(nextState: ReceiverState): void {
+    receiverVersionRef.current += 1;
     receiverStateRef.current = nextState;
     setReceiverState(nextState);
+  }
+
+  function isCurrentVerification(receiverVersion: number, verifyRunId: number): boolean {
+    return receiverVersionRef.current === receiverVersion && verifyRunRef.current === verifyRunId;
   }
 
   useEffect(
@@ -424,11 +441,12 @@ function ReceivePanel() {
     stopCameraTracks();
     const runId = cameraRunRef.current + 1;
     cameraRunRef.current = runId;
+    let stream: MediaStream | null = null;
 
     try {
-      const stream = await openCameraStream();
+      stream = await openCameraStream();
       if (cameraRunRef.current !== runId) {
-        stopCameraStream(stream);
+        releaseCameraStream(stream);
         return;
       }
       streamRef.current = stream;
@@ -437,7 +455,7 @@ function ReceivePanel() {
         await videoRef.current.play();
       }
       if (cameraRunRef.current !== runId) {
-        stopCameraTracks();
+        releaseCameraStream(stream);
         return;
       }
       setMessage('Scanning QR frames');
@@ -447,6 +465,9 @@ function ReceivePanel() {
         }
       }, SCAN_INTERVAL_MS);
     } catch (cameraError) {
+      if (stream !== null) {
+        releaseCameraStream(stream);
+      }
       if (cameraRunRef.current !== runId) {
         return;
       }
@@ -458,18 +479,27 @@ function ReceivePanel() {
 
   async function verifyTransfer(): Promise<void> {
     setError('');
+    const receiverVersion = receiverVersionRef.current;
+    const verifyRunId = verifyRunRef.current + 1;
+    verifyRunRef.current = verifyRunId;
 
     try {
       const currentState = receiverStateRef.current;
       const result = await verifyReceiverState(currentState);
       const payload = encodePacket(result);
       const nextQrUrl = await renderQrDataUrl(payload);
-      setResultPayload(payload);
-      setResultQrUrl(nextQrUrl);
-      setResultType(result.type);
+      if (!isCurrentVerification(receiverVersion, verifyRunId)) {
+        return;
+      }
 
       if (result.type === 'ack') {
         const file = await buildVerifiedFile(currentState);
+        if (!isCurrentVerification(receiverVersion, verifyRunId)) {
+          return;
+        }
+        setResultPayload(payload);
+        setResultQrUrl(nextQrUrl);
+        setResultType(result.type);
         if (file !== null) {
           clearDownload();
           const url = URL.createObjectURL(new Blob([toArrayBuffer(file.bytes)], { type: file.mimeType }));
@@ -480,9 +510,15 @@ function ReceivePanel() {
         return;
       }
 
+      setResultPayload(payload);
+      setResultQrUrl(nextQrUrl);
+      setResultType(result.type);
       clearDownload();
       setMessage('Repair needed. Show NACK to sender.');
     } catch (verifyError) {
+      if (!isCurrentVerification(receiverVersion, verifyRunId)) {
+        return;
+      }
       setError(getVerifyErrorMessage(verifyError));
     }
   }
