@@ -62,6 +62,13 @@
   - [x] Commit Task 4 transfer files
   - [x] Spec compliance review passed
   - [x] Code quality re-review passed after repeated manifest fix
+- [x] Implement Task 5 QR display and scanner adapters
+  - [x] Add QR display test and confirm RED
+  - [x] Implement QR display data URL adapter
+  - [x] Add QR scanner tests and confirm RED
+  - [x] Implement QR scanner decode, camera, stop, and capture adapters
+  - [x] Verify QR, protocol, transfer tests, and production build under Node 20.20.2
+  - [x] Commit Task 5 QR adapter files
 - [ ] Build the approved MVP
 - [ ] Verify transfer behavior with repeatable tests
 - [ ] Document results and remaining risks
@@ -80,6 +87,8 @@
 - Task 3 review gate passed after `eff9cef`; code quality re-review found no remaining Critical, Important, or Minor issues. Carry-forward for Task 4: validate decoded NACK indexes against the active transfer before selecting repair chunks.
 - Task 4 sender/receiver transfer state: RED check under Node 20.20.2 showed missing `sender` and `receiver` modules before implementation. Final verification under Node 20.20.2: `npm test -- src/transfer` exited 0 with 2 files and 8 tests passing; `npm test -- src/protocol src/transfer` exited 0 with 8 files and 52 tests passing; `npm run build` exited 0.
 - Task 4 self-review: sender repair selection bounds NACK expansion by `manifest.totalChunks`; receiver rejects active-transfer mismatches without storing chunks; complete hash mismatch returns NACK with empty `missingRanges`; `buildVerifiedFile` only returns bytes after ACK verification.
+- Task 5 QR display and scanner adapters committed as `37ba393` (`feat: add QR display and scanner adapters`). RED checks observed missing `qrDisplay` and `qrScanner` modules before implementation. Final verification under Node 20.20.2: `npm test -- src/qr` exited 0 with 2 files and 5 tests passing; `npm test -- src/protocol src/transfer src/qr` exited 0 with 10 files and 64 tests passing; `npm run build` exited 0; extra full `npm test` exited 0 with 10 files and 64 tests passing.
+- Task 5 self-review: QR display uses the requested low error-correction, margin, and scale settings; scanner decode returns payload data or `null`; camera stream lifecycle stays in `src/qr`; stop logic stops every track; capture rejects zero-size frames and reads from a 2D canvas.
 
 ## Task 2 Missing Range Re-review
 
