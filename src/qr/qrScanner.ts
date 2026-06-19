@@ -1,20 +1,46 @@
 import jsQR from 'jsqr';
 
+export type CameraErrorCode = 'insecure-context' | 'unsupported' | 'permission-denied' | 'not-found' | 'unknown';
+
+export class CameraAccessError extends Error {
+  constructor(
+    public readonly code: CameraErrorCode,
+    message: string,
+    public override readonly cause?: unknown,
+  ) {
+    super(message);
+    this.name = 'CameraAccessError';
+  }
+}
+
+const cameraConstraints: MediaStreamConstraints = {
+  audio: false,
+  video: {
+    facingMode: 'environment',
+  },
+};
+
 export function decodeQrFromImageData(imageData: ImageData): string | null {
   const code = jsQR(imageData.data, imageData.width, imageData.height);
   return code?.data ?? null;
 }
 
 export async function openCameraStream(): Promise<MediaStream> {
-  if (!navigator.mediaDevices?.getUserMedia) {
-    throw new Error('Camera access is not supported in this browser');
+  if (globalThis.isSecureContext === false) {
+    throw new CameraAccessError(
+      'insecure-context',
+      'Camera access requires a secure context. Use HTTPS or localhost.',
+    );
   }
-  return navigator.mediaDevices.getUserMedia({
-    audio: false,
-    video: {
-      facingMode: 'environment',
-    },
-  });
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new CameraAccessError('unsupported', 'Camera access is not supported in this browser');
+  }
+  try {
+    return await navigator.mediaDevices.getUserMedia(cameraConstraints);
+  } catch (error) {
+    const code = getCameraErrorCode(error);
+    throw new CameraAccessError(code, getCameraErrorMessage(code), error);
+  }
 }
 
 export function stopCameraStream(stream: MediaStream): void {
@@ -37,4 +63,34 @@ export function captureVideoFrame(video: HTMLVideoElement, canvas: HTMLCanvasEle
   }
   context.drawImage(video, 0, 0, width, height);
   return context.getImageData(0, 0, width, height);
+}
+
+function getCameraErrorCode(error: unknown): CameraErrorCode {
+  const errorName = getErrorName(error);
+  if (errorName === 'NotAllowedError' || errorName === 'SecurityError') {
+    return 'permission-denied';
+  }
+  if (errorName === 'NotFoundError' || errorName === 'OverconstrainedError') {
+    return 'not-found';
+  }
+  return 'unknown';
+}
+
+function getErrorName(error: unknown): string | undefined {
+  if (typeof error === 'object' && error !== null && 'name' in error) {
+    const name = (error as { name: unknown }).name;
+    return typeof name === 'string' ? name : undefined;
+  }
+  return undefined;
+}
+
+function getCameraErrorMessage(code: CameraErrorCode): string {
+  switch (code) {
+    case 'permission-denied':
+      return 'Camera permission was denied or blocked by browser settings';
+    case 'not-found':
+      return 'No usable camera was found';
+    default:
+      return 'Could not open the camera';
+  }
 }

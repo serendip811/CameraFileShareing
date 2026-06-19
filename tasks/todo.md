@@ -69,6 +69,11 @@
   - [x] Implement QR scanner decode, camera, stop, and capture adapters
   - [x] Verify QR, protocol, transfer tests, and production build under Node 20.20.2
   - [x] Commit Task 5 QR adapter files
+- [x] Fix Task 5 camera access error classification
+  - [x] Add RED tests for jsQR call arguments, camera constraints, classified camera failures, and capture branches
+  - [x] Implement typed camera error model and `getUserMedia` failure mapping
+  - [x] Verify QR, protocol, transfer tests, and production build under Node 20.20.2
+  - [x] Commit camera error classification fix
 - [ ] Build the approved MVP
 - [ ] Verify transfer behavior with repeatable tests
 - [ ] Document results and remaining risks
@@ -89,6 +94,7 @@
 - Task 4 self-review: sender repair selection bounds NACK expansion by `manifest.totalChunks`; receiver rejects active-transfer mismatches without storing chunks; complete hash mismatch returns NACK with empty `missingRanges`; `buildVerifiedFile` only returns bytes after ACK verification.
 - Task 5 QR display and scanner adapters committed as `37ba393` (`feat: add QR display and scanner adapters`). RED checks observed missing `qrDisplay` and `qrScanner` modules before implementation. Final verification under Node 20.20.2: `npm test -- src/qr` exited 0 with 2 files and 5 tests passing; `npm test -- src/protocol src/transfer src/qr` exited 0 with 10 files and 64 tests passing; `npm run build` exited 0; extra full `npm test` exited 0 with 10 files and 64 tests passing.
 - Task 5 self-review: QR display uses the requested low error-correction, margin, and scale settings; scanner decode returns payload data or `null`; camera stream lifecycle stays in `src/qr`; stop logic stops every track; capture rejects zero-size frames and reads from a 2D canvas.
+- Task 5 camera access review fix: RED check showed 4 expected QR scanner failures before implementation. Final verification under Node 20.20.2: `npm test -- src/qr` exited 0 with 2 files and 15 tests passing; `npm test -- src/protocol src/transfer src/qr` exited 0 with 10 files and 74 tests passing; `npm run build` exited 0.
 
 ## Task 2 Missing Range Re-review
 

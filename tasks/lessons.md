@@ -6,3 +6,4 @@
 - When using Web Crypto with TypeScript 6 typed arrays, pass a BufferSource with an `ArrayBuffer`-backed copy and run `npm run build`; runtime tests alone can miss BufferSource type narrowing issues.
 - When hardening protocol decoders, validate cross-field invariants and canonical encodings too; independent field validation can still admit impossible packets or normalized alternate wire forms.
 - When implementing QR transfer state, test the actual looped stream shape: repeated identical manifests must be idempotent, conflicting manifests must be rejected, and verification-failure NACKs must request actionable repair chunks.
+- When wrapping browser hardware APIs, classify environmental failures separately from unsupported capability; mobile LAN HTTP can hide camera APIs because the context is insecure, and UI code needs actionable error codes.
